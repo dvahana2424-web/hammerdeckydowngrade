@@ -69,7 +69,16 @@ def detect_steam() -> dict[str, Any]:
     }
 
 
+def _proc_state(pid: int) -> str | None:
+    try:
+        with open(f"/proc/{pid}/stat") as f:
+            return f.read().split()[2]
+    except OSError:
+        return None
+
+
 def check_steam_running() -> bool:
+    """True if a live (non-zombie) steam / steamwebhelper / reaper is up."""
     for prog in ("steam", "steamwebhelper", "reaper"):
         try:
             r = subprocess.run(
@@ -80,8 +89,13 @@ def check_steam_running() -> bool:
             )
         except (FileNotFoundError, subprocess.TimeoutExpired):
             continue
-        if r.returncode == 0:
-            return True
+        if r.returncode != 0:
+            continue
+        for pid_s in r.stdout.split():
+            with contextlib.suppress(ValueError):
+                state = _proc_state(int(pid_s))
+                if state and state != "Z":
+                    return True
     return False
 
 
@@ -158,7 +172,9 @@ def main() -> int:
     target_version = meta["version"]
 
     if check_steam_running():
-        err("Steam is still running. Exit Steam first, then run again.")
+        err("Steam is still running (live process, not a zombie).")
+        err("Close Steam first (tray → Exit), or run:")
+        err("  steam -shutdown; sleep 3; killall -9 steam steam.sh steamwebhelper")
         return 1
 
     steam = detect_steam()

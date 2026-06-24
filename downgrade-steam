@@ -37,9 +37,16 @@ need_cmd() {
 }
 
 steam_running() {
-	pgrep -x steam >/dev/null 2>&1 \
-		|| pgrep -x steamwebhelper >/dev/null 2>&1 \
-		|| pgrep -x reaper >/dev/null 2>&1
+	local prog pid state
+	for prog in steam steamwebhelper reaper; do
+		while read -r pid; do
+			[[ -n "$pid" ]] || continue
+			state="$(awk '{print $3}' "/proc/$pid/stat" 2>/dev/null)" || continue
+			[[ "$state" == "Z" ]] && continue
+			return 0
+		done < <(pgrep -x "$prog" 2>/dev/null || true)
+	done
+	return 1
 }
 
 download() {
@@ -106,7 +113,8 @@ main() {
 	info "Source: ${BASE_URL}/steam-cache/${STEAM_VERSION}/"
 
 	if steam_running; then
-		die "Steam is still running. Exit Steam first (tray → Exit Steam), then run again."
+		die "Steam is still running (or a stale steam zombie exists)." \
+			"Try: steam -shutdown; sleep 3; killall -9 steam steam.sh steamwebhelper 2>/dev/null; sleep 2"
 	fi
 
 	local tmp
