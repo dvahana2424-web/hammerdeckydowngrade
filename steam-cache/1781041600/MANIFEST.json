@@ -6,8 +6,8 @@
   "sha": "f55f159fb1978cefa0a56e1bbc51f0e9c86cc980",
   "cache_dir": "steam_client_steamdeck_stable_ubuntu12-f55f159fb197",
   "archive": "steam-1781041600-cache.tar.zst",
-  "archive_sha256": "58c3387def4b3f1660e6340f94e8c27a01e5404632277114439061fb85e75edb",
-  "archive_bytes": 707766650,
+  "archive_sha256": "61161a4a2c5e07145ec3a8278c422d6c2114a02b13bc95a311e87e444f2f74f6",
+  "archive_bytes": 1127077166,
   "parts": [
     "parts/part-aa",
     "parts/part-ab",
@@ -16,8 +16,12 @@
     "parts/part-ae",
     "parts/part-af",
     "parts/part-ag",
-    "parts/part-ah"
+    "parts/part-ah",
+    "parts/part-ai",
+    "parts/part-aj",
+    "parts/part-ak",
+    "parts/part-al"
   ],
   "staged_at": "2026-06-24T13:53:01",
-  "note": "SteamOS Deck stable client packages for downgrade via hammer-downgrader apply flow"
+  "note": "Includes zipvz compressed packages required by Steam bootstrap (v2)"
 }

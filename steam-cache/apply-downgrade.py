@@ -112,14 +112,18 @@ def start_package_server(package_dir: Path) -> ThreadingHTTPServer:
 
 def run_steam_textmode(flavour: str, manifest_name: str, args: list[str]) -> int:
     if flavour == "flatpak":
-        cmd = ["flatpak", "run", "com.valvesoftware.Steam", *args]
+        base = ["flatpak", "run", "com.valvesoftware.Steam"]
     else:
-        cmd = ["steam", *args]
+        base = ["steam"]
+    if flavour == "native" and not manifest_name.startswith("steam_client_steamdeck"):
+        base.append("-clearbeta")
+    # Strip Hammer LD_AUDIT — steam inherits it from the Deck environment
+    # and the 32-bit audit shims break textmode update.
+    cmd = ["env", "-u", "LD_AUDIT", "-u", "LD_PRELOAD", *base, *args]
     env = os.environ.copy()
     env.pop("LD_AUDIT", None)
+    env.pop("LD_PRELOAD", None)
     env["STEAM_FRAME_FORCE_CLOSE"] = "1"
-    if flavour == "native" and not manifest_name.startswith("steam_client_steamdeck"):
-        cmd.insert(1 if flavour == "flatpak" else 0, "-clearbeta")
     info("$ " + " ".join(cmd))
     proc = subprocess.Popen(
         cmd,

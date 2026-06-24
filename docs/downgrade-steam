@@ -160,6 +160,12 @@ for p in json.load(open('$manifest'))['parts']:
 		ok "Cache staged: $cache_dir"
 	fi
 
+	# Steam bootstrap requests zipvz payloads; older caches only had "file" zips.
+	local ensure_py="$tmp/ensure-zipvz.py"
+	download "${BASE_URL}/steam-cache/ensure-zipvz.py" "$ensure_py"
+	info "Ensuring zipvz package files are present …"
+	python3 "$ensure_py" "$cache_dir" || die "Failed to fetch zipvz package files"
+
 	if [[ "$SKIP_APPLY" == "1" ]]; then
 		ok "SKIP_APPLY=1 — cache ready, apply skipped."
 		ok "Run: python3 <(curl -fsSL ${BASE_URL}/steam-cache/apply-downgrade.py) $cache_subdir"

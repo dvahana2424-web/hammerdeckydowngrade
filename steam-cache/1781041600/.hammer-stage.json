@@ -3,8 +3,8 @@
   "upstream": "steam_client_ubuntu12",
   "sha": "f55f159fb1978cefa0a56e1bbc51f0e9c86cc980",
   "version": "1781041600",
-  "files": 28,
-  "bytes": 724065213,
+  "files": 51,
+  "bytes": 1143236775,
   "staged_at": "2026-06-24T13:53:01",
   "steam_flavour": "native",
   "steam_dir": "/home/deck/.steam/steam"
