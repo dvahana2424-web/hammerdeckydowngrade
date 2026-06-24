@@ -1,4 +1,5 @@
 build_date=2026-06-24
-hammersteam_bytes=16828188
+hammer_version=1.1.6
+hammersteam_bytes=16829304
 steam_client_build=1782257239
-notes=pattern ?? fix baked in hammersteam.so + Jun 24 Steam patterns in config.yaml
+notes=SteamlessCliPath tilde (~) expansion fix; pattern fixes for build 1782257239
