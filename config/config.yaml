@@ -1,0 +1,98 @@
+DisableFamilyShareLock: yes
+
+DepotResponsePatchEnabled: yes
+DepotResponsePatchBypassAuthFailures: yes
+InstallAppForceSuccess: yes
+DepotResponsePatchDepots: []
+DepotDecryptionPattern: ""
+
+UseWhitelist: no
+AutoFilterList: yes
+AppIds: []
+
+PlayNotOwnedGames: yes
+
+AdditionalApps: []
+
+DlcData: {}
+DenuvoGames: {}
+AppTokens: {}
+FakeOffline: []
+FakeAppIds: {}
+
+IdleStatus:
+  AppId: 0
+  Title: ""
+
+GameTitles: {}
+SubscriptionTimestamps: {}
+
+SafeMode: yes
+Notifications: no
+WarnHashMissmatch: no
+NotifyInit: yes
+API: no
+
+FakeEmail: ""
+FakeWalletBalance: 0
+
+Hammerlog: 2
+ExtendedLogging: yes
+
+ManifestHookEnabled: yes
+ManifestPattern: "e8 ? ? ? ? 05 ? ? ? ? 55 89 e5 57 56 53 81 ec 10 01 00"
+GetManifestRequestCodeOffset: 0x1341890
+ManifestProvider: Ost
+ManifestFallbackProvider: yes
+ManifestLocalCacheFallback: yes
+ManifestDepotAllowFromKeys: yes
+ManifestDepots: []
+
+OwnershipTicketDiskFallback: no
+
+UserOwnsDepotHookEnabled: yes
+UserOwnsDepotOffset: 0x185f1b0
+UserOwnsDepotPattern: "55 e8 ? ? ? ? 81 c5 ? ? ? ? 57 56 53 83 ec 74 ff b4 24"
+
+SteamlessAutoPatchEnabled: yes
+# SteamlessPatchEnabled: yes   # alias — same meaning as SteamlessAutoPatchEnabled
+SteamlessCliPath: "/home/deck/.config/hammersteam/SteamlessCLI"
+SteamlessCliTimeoutSeconds: 120
+SteamlessRecursiveScan: yes
+SteamlessQuiet: yes
+SteamlessAppIds: []
+
+DepotDecryptionKeys: {}
+
+# TUNIC 553420: default stat Steam ID (76561198028121353). Do not use
+# 76561197960287930 — Steam returns eresult=FAILURE + schema=0 for that ID.
+StatSteamIds: {}
+
+NetPacketHooksEnabled: no
+NetPacketLogOnly: no
+NetPacketAllowHeuristicRecv: no
+BBuildAndAsyncSendFrameOffset: 0
+# MUST stay 0 until RecvMultiPkt hook target is verified — 0x16d3840 is
+# CRemoteClientManager::RecvPkt (wrong ABI) and crashes Steam on startup.
+RecvPktOffset: 0
+
+AllowMissingPatterns: yes
+PatternOverrides:
+  "IClientApps::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 37 9c 88 a6"
+  "IClientRemoteStorage::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 6c e8 2f 87"
+  "IClientUGC::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 62 0c d2 71"
+  "IClientUserStats::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 8f 65 6d 87"
+  "CAPIJob::GetPlayerStats": "e8 ? ? ? ? 83 c4 10 89 c5 e9 ? ? ? ? ? ? 80 be ? ? ? ? 00"
+  "BBuildAndAsyncSendFrame": "55 89 e5 57 e8 ? ? ? ? 81 c7 ? ? ? ? 56 53 81 ec ac 00 00 00 8b"
+  "RecvPkt": "55 89 e5 57 56 e8 ? ? ? ? 81 c6 ? ? ? ? 53 83 ec 1c 8b 86 ? ?"
+
+# Hammer Cloud Save — Google Drive sync (mirrors hammer.toml [cloud_save] on Windows)
+CloudSaveEnabled: yes
+CloudSaveProvider: gdrive
+CloudSaveTokenPath: ~/.config/hammersteam/cloud_save_token.json
+CloudSaveAllAdditionalApps: yes
+CloudSaveAppIds: [553420, 413150]
+CloudSaveSyncAchievements: no
+CloudSaveSyncPlaytime: no
+CloudSaveStorageSubdir: hammer_cloud_save
+CloudSaveGDriveRoot: HammerCloudSave
