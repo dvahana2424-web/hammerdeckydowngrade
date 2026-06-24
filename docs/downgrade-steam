@@ -62,44 +62,14 @@ download() {
 }
 
 download_parts() {
-	local manifest="$1" dest_dir="$2"
-	local parts_json part url name
-	parts_json="$(python3 -c "
-import json,sys
-m=json.load(open(sys.argv[1]))
-for p in m['parts']:
-    print(p)
-" "$manifest")"
-
-	local -a parts=()
-	while IFS= read -r line; do
-		[[ -n "$line" ]] && parts+=("$line")
-	done <<< "$parts_json"
-
-	local total="${#parts[@]}"
-	info "Downloading ${total} cache parts (~675 MB compressed) …"
-
-	local i=0 running=0
-	for part in "${parts[@]}"; do
-		name="$(basename "$part")"
-		url="${BASE_URL}/steam-cache/${STEAM_VERSION}/${part}"
-		if [[ -s "$dest_dir/$name" ]]; then
-			info "  cached  $name"
-			continue
-		fi
-		(
-			download "$url" "$dest_dir/$name"
-			info "  done    $name"
-		) &
-		running=$((running + 1))
-		i=$((i + 1))
-		if (( running >= PARALLEL )); then
-			wait -n
-			running=$((running - 1))
-		fi
-	done
-	wait
-	ok "All parts downloaded."
+	local manifest="$1" dest_dir="$2" dl_py="$3"
+	python3 "$dl_py" \
+		--manifest "$manifest" \
+		--dest-dir "$dest_dir" \
+		--base-url "$BASE_URL" \
+		--version "$STEAM_VERSION" \
+		--parallel "$PARALLEL" \
+		|| die "Part download failed"
 }
 
 main() {
@@ -140,7 +110,10 @@ print(m['cache_dir'], m['archive'], m['archive_sha256'], m['archive_bytes'])
 		ok "Cache already staged at $cache_dir"
 	else
 		mkdir -p "$tmp/parts"
-		download_parts "$manifest" "$tmp/parts"
+		local dl_py="$tmp/download-parts.py"
+		download "${BASE_URL}/steam-cache/download-parts.py" "$dl_py"
+		chmod +x "$dl_py"
+		download_parts "$manifest" "$tmp/parts" "$dl_py"
 
 		info "Reassembling archive …"
 		local part_path part_file
