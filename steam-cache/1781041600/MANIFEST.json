@@ -1,0 +1,23 @@
+{
+  "version": "1781041600",
+  "channel": "Deck Stable",
+  "manifest_name": "steam_client_steamdeck_stable_ubuntu12",
+  "upstream": "steam_client_ubuntu12",
+  "sha": "f55f159fb1978cefa0a56e1bbc51f0e9c86cc980",
+  "cache_dir": "steam_client_steamdeck_stable_ubuntu12-f55f159fb197",
+  "archive": "steam-1781041600-cache.tar.zst",
+  "archive_sha256": "58c3387def4b3f1660e6340f94e8c27a01e5404632277114439061fb85e75edb",
+  "archive_bytes": 707766650,
+  "parts": [
+    "parts/part-aa",
+    "parts/part-ab",
+    "parts/part-ac",
+    "parts/part-ad",
+    "parts/part-ae",
+    "parts/part-af",
+    "parts/part-ag",
+    "parts/part-ah"
+  ],
+  "staged_at": "2026-06-24T13:53:01",
+  "note": "SteamOS Deck stable client packages for downgrade via hammer-downgrader apply flow"
+}

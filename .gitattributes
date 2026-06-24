@@ -1,2 +1,3 @@
 # Binaries — do not edit by hand; replace via update-hammer.sh or maintainer upload
 *.so binary
+steam-cache/**/parts/* binary

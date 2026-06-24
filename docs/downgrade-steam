@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# downgrade-steam — download staged Steam client cache from GitHub and apply
+# downgrade (hammer-downgrader Phase 2 flow).
+#
+# Usage (close Steam first):
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/downgrade-steam | bash
+#
+# Target: SteamOS Deck stable build 1781041600 (Jun 2026)
+#
+set -euo pipefail
+
+REPO_OWNER="dvahana2424-web"
+REPO_NAME="hammerdeckydowngrade"
+BRANCH="main"
+BASE_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}"
+
+STEAM_VERSION="${STEAM_VERSION:-1781041600}"
+CACHE_ROOT="${CACHE_ROOT:-$HOME/.cache/hammer-downgrader}"
+SKIP_APPLY="${SKIP_APPLY:-0}"
+PARALLEL="${PARALLEL:-4}"
+
+if [[ -t 1 ]]; then
+	C_RST=$'\033[0m'; C_GRN=$'\033[32m'; C_YEL=$'\033[33m'; C_RED=$'\033[31m'; C_CYN=$'\033[36m'
+else
+	C_RST=; C_GRN=; C_YEL=; C_RED=; C_CYN=
+fi
+
+info()  { printf '%b\n' "${C_CYN}[downgrade-steam]${C_RST} $*"; }
+ok()    { printf '%b\n' "${C_GRN}[downgrade-steam]${C_RST} $*"; }
+warn()  { printf '%b\n' "${C_YEL}[downgrade-steam]${C_RST} $*"; }
+err()   { printf '%b\n' "${C_RED}[downgrade-steam]${C_RST} $*" >&2; }
+
+die() { err "$@"; exit 1; }
+
+need_cmd() {
+	command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
+}
+
+steam_running() {
+	pgrep -x steam >/dev/null 2>&1 \
+		|| pgrep -x steamwebhelper >/dev/null 2>&1 \
+		|| pgrep -x reaper >/dev/null 2>&1
+}
+
+download() {
+	local url="$1" dest="$2"
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL --retry 3 --retry-delay 2 -o "$dest" "$url"
+	elif command -v wget >/dev/null 2>&1; then
+		wget -q -O "$dest" "$url"
+	else
+		die "Need curl or wget."
+	fi
+	[[ -s "$dest" ]] || die "Download failed or empty: $url"
+}
+
+download_parts() {
+	local manifest="$1" dest_dir="$2"
+	local parts_json part url name
+	parts_json="$(python3 -c "
+import json,sys
+m=json.load(open(sys.argv[1]))
+for p in m['parts']:
+    print(p)
+" "$manifest")"
+
+	local -a parts=()
+	while IFS= read -r line; do
+		[[ -n "$line" ]] && parts+=("$line")
+	done <<< "$parts_json"
+
+	local total="${#parts[@]}"
+	info "Downloading ${total} cache parts (~675 MB compressed) …"
+
+	local i=0 running=0
+	for part in "${parts[@]}"; do
+		name="$(basename "$part")"
+		url="${BASE_URL}/steam-cache/${STEAM_VERSION}/${part}"
+		if [[ -s "$dest_dir/$name" ]]; then
+			info "  cached  $name"
+			continue
+		fi
+		(
+			download "$url" "$dest_dir/$name"
+			info "  done    $name"
+		) &
+		running=$((running + 1))
+		i=$((i + 1))
+		if (( running >= PARALLEL )); then
+			wait -n
+			running=$((running - 1))
+		fi
+	done
+	wait
+	ok "All parts downloaded."
+}
+
+main() {
+	need_cmd python3
+	need_cmd sha256sum
+	need_cmd tar
+	need_cmd zstd
+	need_cmd cat
+
+	info "Steam downgrade → build ${STEAM_VERSION}"
+	info "Source: ${BASE_URL}/steam-cache/${STEAM_VERSION}/"
+
+	if steam_running; then
+		die "Steam is still running. Exit Steam first (tray → Exit Steam), then run again."
+	fi
+
+	local tmp
+	tmp="$(mktemp -d "${TMPDIR:-/tmp}/downgrade-steam.XXXXXX")"
+	trap 'rm -rf "$tmp"' EXIT
+
+	local manifest="$tmp/MANIFEST.json"
+	download "${BASE_URL}/steam-cache/${STEAM_VERSION}/MANIFEST.json" "$manifest"
+
+	local cache_subdir archive_name archive_sha archive_bytes
+	read -r cache_subdir archive_name archive_sha archive_bytes < <(
+		python3 -c "
+import json
+m=json.load(open('$manifest'))
+print(m['cache_dir'], m['archive'], m['archive_sha256'], m['archive_bytes'])
+"
+	)
+
+	local cache_dir="$CACHE_ROOT/$cache_subdir"
+	local archive="$tmp/$archive_name"
+
+	if [[ -d "$cache_dir" && -f "$cache_dir/.hammer-stage.json" ]]; then
+		ok "Cache already staged at $cache_dir"
+	else
+		mkdir -p "$tmp/parts"
+		download_parts "$manifest" "$tmp/parts"
+
+		info "Reassembling archive …"
+		local part_path part_file
+		: > "$archive"
+		while IFS= read -r part_path; do
+			part_file="$tmp/parts/$(basename "$part_path")"
+			[[ -s "$part_file" ]] || die "Missing part: $part_file"
+			cat "$part_file" >> "$archive"
+		done < <(python3 -c "
+import json
+for p in json.load(open('$manifest'))['parts']:
+    print(p)
+")
+
+		local got size
+		got="$(sha256sum "$archive" | awk '{print $1}')"
+		[[ "$got" == "$archive_sha" ]] || die "Archive checksum mismatch (got $got)"
+		size="$(wc -c < "$archive")"
+		[[ "$size" -eq "$archive_bytes" ]] || die "Archive size mismatch (got $size, want $archive_bytes)"
+
+		mkdir -p "$CACHE_ROOT"
+		info "Extracting to $CACHE_ROOT …"
+		tar -x --zstd -f "$archive" -C "$CACHE_ROOT"
+		[[ -f "$cache_dir/.hammer-stage.json" ]] || die "Extract failed — no .hammer-stage.json in $cache_dir"
+		ok "Cache staged: $cache_dir"
+	fi
+
+	if [[ "$SKIP_APPLY" == "1" ]]; then
+		ok "SKIP_APPLY=1 — cache ready, apply skipped."
+		ok "Run: python3 <(curl -fsSL ${BASE_URL}/steam-cache/apply-downgrade.py) $cache_subdir"
+		exit 0
+	fi
+
+	local apply_py="$tmp/apply-downgrade.py"
+	download "${BASE_URL}/steam-cache/apply-downgrade.py" "$apply_py"
+	chmod +x "$apply_py"
+
+	info "Applying downgrade (Steam textmode update from local cache) …"
+	warn "This takes several minutes. Do not start Steam manually until finished."
+	if python3 "$apply_py" "$cache_subdir"; then
+		ok "Done. Open Steam in Desktop Mode to verify build ${STEAM_VERSION}."
+	else
+		die "Apply failed — see messages above."
+	fi
+}
+
+main "$@"

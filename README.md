@@ -60,3 +60,29 @@ chmod 755 ~/.local/share/Hammer/*.so
 ```
 
 Restart Steam after updating.
+
+## Steam downgrade (build 1781041600)
+
+Downgrade SteamOS Deck stable client to build **1781041600** using cached
+packages from [hammer-downgrader](https://github.com/dvahana2424-web/hamdeck/tree/hammer-1.1.6/Hammer%20cloud%20save/hamdeck-hammer-1.1.3/tools/hammer-downgrader).
+
+**Exit Steam first**, then paste in Konsole:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/downgrade-steam | bash
+```
+
+What it does:
+1. Downloads ~675 MB staged cache from `steam-cache/1781041600/` on this repo
+2. Extracts to `~/.cache/hammer-downgrader/steam_client_steamdeck_stable_ubuntu12-f55f159fb197/`
+3. Runs Steam in textmode pointed at the local cache (same as hammer-downgrader **Apply**)
+4. Writes `steam.cfg` to inhibit auto-update
+
+Options:
+- `SKIP_APPLY=1` — download/cache only, no Steam textmode apply
+- `PARALLEL=2` — fewer parallel downloads if network is flaky
+
+Cache only (no apply):
+```bash
+SKIP_APPLY=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/downgrade-steam | bash
+```
