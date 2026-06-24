@@ -92,7 +92,7 @@ main() {
 	backup_dir="$CONFIG_DIR/backups/update-$stamp"
 	mkdir -p "$HAMMER_DIR" "$CONFIG_DIR" "$backup_dir"
 
-	for f in "$HAMMER_SO" "$INJECT_SO" "$CONFIG_FILE"; do
+	for f in "$HAMMER_SO" "$INJECT_SO"; do
 		if [[ -f "$f" ]]; then
 			cp -a "$f" "$backup_dir/"
 			info "Backed up $(basename "$f") → $backup_dir/"
@@ -101,14 +101,26 @@ main() {
 
 	cp -f "$tmp/hammersteam.so"   "$HAMMER_SO"
 	cp -f "$tmp/library-inject.so" "$INJECT_SO"
-	cp -f "$tmp/config.yaml"      "$CONFIG_FILE"
 	chmod 0755 "$HAMMER_SO" "$INJECT_SO"
-	chmod 0644 "$CONFIG_FILE"
 
 	ok "Installed:"
 	ok "  $HAMMER_SO"
 	ok "  $INJECT_SO"
-	ok "  $CONFIG_FILE"
+
+	if [[ -f "$CONFIG_FILE" ]] && [[ "${FORCE_CONFIG:-0}" != "1" ]]; then
+		warn "Keeping your existing config.yaml"
+		warn "(only installed when missing — set FORCE_CONFIG=1 to overwrite)"
+	elif [[ -f "$CONFIG_FILE" ]]; then
+		cp -a "$CONFIG_FILE" "$backup_dir/"
+		info "Backed up config.yaml → $backup_dir/"
+		cp -f "$tmp/config.yaml" "$CONFIG_FILE"
+		chmod 0644 "$CONFIG_FILE"
+		ok "  $CONFIG_FILE (overwritten)"
+	else
+		cp -f "$tmp/config.yaml" "$CONFIG_FILE"
+		chmod 0644 "$CONFIG_FILE"
+		ok "  $CONFIG_FILE (new — working defaults for Steam build 1782257239)"
+	fi
 	ok "Backups: $backup_dir"
 
 	if download "${BASE_URL}/VERSION.txt" "$tmp/VERSION.txt" 2>/dev/null; then

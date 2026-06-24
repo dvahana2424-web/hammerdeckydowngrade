@@ -56,7 +56,7 @@ UserOwnsDepotPattern: "55 e8 ? ? ? ? 81 c5 ? ? ? ? 57 56 53 83 ec 74 ff b4 24"
 
 SteamlessAutoPatchEnabled: yes
 # SteamlessPatchEnabled: yes   # alias — same meaning as SteamlessAutoPatchEnabled
-SteamlessCliPath: "/home/deck/.config/hammersteam/SteamlessCLI"
+SteamlessCliPath: "~/.config/hammersteam/SteamlessCLI"
 SteamlessCliTimeoutSeconds: 120
 SteamlessRecursiveScan: yes
 SteamlessQuiet: yes
