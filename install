@@ -2,10 +2,10 @@
 # update-hammer.sh — download latest Hammer binaries + config from GitHub
 # and install them to the standard Hammer paths on Steam Deck / Linux.
 #
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer.sh | bash
-#   # or after cloning:
-#   ./update-hammer.sh
+# Usage (paste in Konsole — close Steam first):
+#   curl -fsSL https://hammerdeckydowngrade.pages.dev/install | bash
+#   curl -fsSL https://dvahana2424-web.github.io/hammerdeckydowngrade/install | bash
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install | bash
 #
 set -euo pipefail
 
