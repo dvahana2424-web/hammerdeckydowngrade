@@ -6,18 +6,29 @@ Repository: [dvahana2424-web/hammerdeckydowngrade](https://github.com/dvahana242
 
 ## Quick update (Steam Deck / Linux)
 
-Close Steam first, then run:
+Close Steam first, then paste **one** of these in Konsole:
 
+**Shortest (GitHub Pages — like headcrab):**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer.sh | bash
+curl -fsSL https://hammerdeckydowngrade.pages.dev/install | bash
+```
+
+**GitHub.io mirror:**
+```bash
+curl -fsSL https://dvahana2424-web.github.io/hammerdeckydowngrade/install | bash
+```
+
+**Raw GitHub (always works, no Pages needed):**
+```bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install | bash
 ```
 
 Or download and run locally:
 
 ```bash
-curl -fsSL -O https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer.sh
-chmod +x update-hammer.sh
-./update-hammer.sh
+curl -fsSL -O https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install
+chmod +x install
+./install
 ```
 
 ## What gets installed
