@@ -1,135 +1,361 @@
 #!/usr/bin/env bash
-# update-hammer.sh — download latest Hammer binaries + config from GitHub
-# and install them to the standard Hammer paths on Steam Deck / Linux.
+# ─────────────────────────────────────────────────────────────────────────────
+#  ValveOFF — ONE-PASTE installer (SteamOS / Bazzite / any Linux)
 #
-# Usage (paste in Konsole — close Steam first):
-#   curl -fsSL https://hammerdeckydowngrade.pages.dev/install | bash
-#   curl -fsSL https://dvahana2424-web.github.io/hammerdeckydowngrade/install | bash
-#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install | bash
+#  Usage (Desktop Mode → Konsole, do NOT run as root):
 #
-set -euo pipefail
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install | bash
+#
+#  What this does, fully automatic, ONE sudo password prompt:
+#    1. Detects the host (SteamOS / Bazzite / generic Linux).
+#    2. SMART CLEANUP of any previous OneTap / SLSsteam install:
+#         • removes its Desktop-Mode unlock (.desktop + LD_AUDIT wrappers)
+#         • removes its Game-Mode unlock (LD_AUDIT in steam-jupiter / steam)
+#         • deletes steam.cfg  → re-enables Steam auto-update
+#         • removes ~/.local/share/SLSsteam and ~/.config/SLSsteam
+#    3. Downloads the ValveOFF bundle into your Downloads folder.
+#    4. Installs Decky Loader (latest) if it isn't already present.
+#    5. Installs Hammer + ValveOFF + hammer-decky and wires Desktop-Mode unlock.
+#    6. Applies Game-Mode unlock (steam-jupiter on SteamOS, /usr/local/bin/steam
+#       wrapper on Bazzite/atomic).
+#
+#  Override the bundle source if you self-host:
+#    VALVEOFF_BUNDLE_URL=https://example/valveoff-bundle.tar.gz curl ... | bash
+# ─────────────────────────────────────────────────────────────────────────────
+set -uo pipefail
 
-REPO_OWNER="dvahana2424-web"
-REPO_NAME="hammerdeckydowngrade"
-BRANCH="main"
-BASE_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}"
+# ── Config ──────────────────────────────────────────────────────────────────
+REPO="dvahana2424-web/hammerdeckydowngrade"
+BUNDLE_TAG="${VALVEOFF_BUNDLE_TAG:-valveoff-1.4}"
+BUNDLE_FILE="valveoff-bundle.tar.gz"
+BUNDLE_URL="${VALVEOFF_BUNDLE_URL:-https://github.com/$REPO/releases/download/$BUNDLE_TAG/$BUNDLE_FILE}"
+BUNDLE_DIRNAME="ValveOFF 1.4"   # folder name created inside Downloads/
 
-HAMMER_DIR="${HAMMER_DIR:-$HOME/.local/share/Hammer}"
-CONFIG_DIR="${CONFIG_DIR:-$HOME/.config/hammersteam}"
-CONFIG_FILE="$CONFIG_DIR/config.yaml"
-
-HAMMER_SO="$HAMMER_DIR/hammersteam.so"
-INJECT_SO="$HAMMER_DIR/library-inject.so"
-
-if [[ -t 1 ]]; then
-	C_RST=$'\033[0m'; C_BOLD=$'\033[1m'
-	C_GRN=$'\033[32m'; C_YEL=$'\033[33m'; C_RED=$'\033[31m'; C_CYN=$'\033[36m'
+# ── Colors (no-op when not a tty) ───────────────────────────────────────────
+if [ -t 1 ]; then
+	C_RST=$'\033[0m'; C_B=$'\033[1m'; C_G=$'\033[32m'; C_Y=$'\033[33m'
+	C_R=$'\033[31m'; C_C=$'\033[36m'
 else
-	C_RST=; C_BOLD=; C_GRN=; C_YEL=; C_RED=; C_CYN=
+	C_RST=""; C_B=""; C_G=""; C_Y=""; C_R=""; C_C=""
 fi
+ok()    { printf "%s[OK]%s   %s\n"  "$C_G" "$C_RST" "$*"; }
+warn()  { printf "%s[WARN]%s %s\n"  "$C_Y" "$C_RST" "$*"; }
+err()   { printf "%s[ERR]%s  %s\n"  "$C_R" "$C_RST" "$*" >&2; }
+info()  { printf "%s[..]%s   %s\n"  "$C_C" "$C_RST" "$*"; }
+title() { printf "\n%s━━ %s ━━%s\n" "$C_B" "$*" "$C_RST"; }
+die()   { err "$*"; exit 1; }
 
-info()  { printf '%b\n' "${C_CYN}[hammer-update]${C_RST} $*"; }
-ok()    { printf '%b\n' "${C_GRN}[hammer-update]${C_RST} $*"; }
-warn()  { printf '%b\n' "${C_YEL}[hammer-update]${C_RST} $*"; }
-err()   { printf '%b\n' "${C_RED}[hammer-update]${C_RST} $*" >&2; }
+# ── Pre-flight ──────────────────────────────────────────────────────────────
+if [ "$(id -u)" = "0" ]; then
+	die "Do NOT run this as root. Paste it in Konsole as your normal user (deck / bazzite / etc.). It will ask for sudo once."
+fi
+command -v curl >/dev/null 2>&1 || die "curl is required but not found."
+command -v tar  >/dev/null 2>&1 || die "tar is required but not found."
 
-die() { err "$@"; exit 1; }
+HOME_DIR="$HOME"
+USER_NAME="$(id -un)"
 
-need_cmd() {
-	command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
+# Resolve the Downloads folder (respect localized XDG dirs; fall back to ~/Downloads).
+resolve_downloads_dir() {
+	local d=""
+	if command -v xdg-user-dir >/dev/null 2>&1; then
+		d="$(xdg-user-dir DOWNLOAD 2>/dev/null || true)"
+	fi
+	[ -z "$d" ] && d="$HOME_DIR/Downloads"
+	mkdir -p "$d" 2>/dev/null || true
+	echo "$d"
+}
+DL_DIR="$(resolve_downloads_dir)"
+DEST="$DL_DIR/$BUNDLE_DIRNAME"
+
+# ── Distro detection ────────────────────────────────────────────────────────
+IS_STEAMOS=0; IS_BAZZITE=0; IS_ATOMIC=0
+detect_distro() {
+	local osr="/etc/os-release"; [ -r "$osr" ] || osr="/usr/lib/os-release"
+	local idline=""
+	[ -r "$osr" ] && idline="$(tr 'A-Z' 'a-z' < "$osr")"
+	case "$idline" in *steamos*|*holo*) IS_STEAMOS=1 ;; esac
+	case "$idline" in *bazzite*) IS_BAZZITE=1 ;; esac
+	case "$idline" in *silverblue*|*kinoite*|*bazzite*) IS_ATOMIC=1 ;; esac
+	# rpm-ostree + immutable /usr is also "atomic"
+	if command -v rpm-ostree >/dev/null 2>&1 && [ "$(stat -c %m /usr 2>/dev/null)" = "/usr" ]; then
+		IS_ATOMIC=1
+	fi
+	# steamos-readonly tool is the most reliable SteamOS signal
+	command -v steamos-readonly >/dev/null 2>&1 && IS_STEAMOS=1
+
+	local label="generic Linux"
+	[ "$IS_ATOMIC" = 1 ]  && label="atomic/immutable (rpm-ostree)"
+	[ "$IS_BAZZITE" = 1 ] && label="Bazzite"
+	[ "$IS_STEAMOS" = 1 ] && label="SteamOS (Steam Deck)"
+	info "Detected host: ${C_B}${label}${C_RST}"
 }
 
-download() {
-	local url="$1" dest="$2"
-	info "Downloading $(basename "$dest") …"
-	if command -v curl >/dev/null 2>&1; then
-		curl -fsSL --retry 3 --retry-delay 2 -o "$dest" "$url"
-	elif command -v wget >/dev/null 2>&1; then
-		wget -q -O "$dest" "$url"
+# ── Single sudo prompt + keepalive ──────────────────────────────────────────
+SUDO_KEEPALIVE_PID=""
+prime_sudo() {
+	title "Admin access (one password)"
+	info "Asking for your sudo password ONCE. It is cached for the rest of the install."
+	if ! sudo -v; then die "sudo authentication failed."; fi
+	# Refresh the cached credential in the background so the big download
+	# never lets the 5-minute sudo timeout lapse mid-install.
+	( while true; do sudo -n true 2>/dev/null; sleep 50; kill -0 "$$" 2>/dev/null || exit 0; done ) &
+	SUDO_KEEPALIVE_PID=$!
+	ok "sudo ready (cached)."
+}
+cleanup() { [ -n "$SUDO_KEEPALIVE_PID" ] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true; }
+trap cleanup EXIT INT TERM
+
+# ── SteamOS read-only rootfs helpers (no-op off SteamOS) ────────────────────
+RO_TOGGLED=0
+usr_writable() { local p="/usr/bin/.valveoff-rw-$$"; if ( : > "$p" ) 2>/dev/null; then rm -f "$p" 2>/dev/null; return 0; fi; return 1; }
+unlock_rootfs() {
+	command -v steamos-readonly >/dev/null 2>&1 || return 0
+	usr_writable && return 0
+	info "Disabling SteamOS read-only filesystem (sudo)…"
+	if sudo steamos-readonly disable 2>/dev/null && usr_writable; then
+		RO_TOGGLED=1; ok "/usr is writable."
 	else
-		die "Need curl or wget to download files."
+		warn "Could not disable steamos-readonly — Game-Mode steps may fail."
 	fi
-	[[ -s "$dest" ]] || die "Download failed or empty: $url"
+}
+relock_rootfs() {
+	[ "$RO_TOGGLED" = 1 ] || return 0
+	sudo steamos-readonly enable 2>/dev/null && ok "Re-enabled SteamOS read-only (safe default)." || \
+		warn "Could not re-enable readonly — run: sudo steamos-readonly enable"
+	RO_TOGGLED=0
 }
 
-steam_running() {
-	pgrep -x steam >/dev/null 2>&1 \
-		|| pgrep -x steamwebhelper >/dev/null 2>&1 \
-		|| pgrep -f '[s]team -srt' >/dev/null 2>&1
+# ── Stop Steam so file patches apply cleanly ────────────────────────────────
+stop_steam() {
+	if pgrep -x steam >/dev/null 2>&1 || pgrep -x steamwebhelper >/dev/null 2>&1; then
+		info "Closing Steam so changes apply cleanly…"
+		pkill -TERM steam steamwebhelper 2>/dev/null || true
+		sleep 2
+		pkill -KILL steam steamwebhelper 2>/dev/null || true
+	fi
 }
 
-main() {
-	need_cmd mkdir
-	need_cmd chmod
-	need_cmd cp
-	need_cmd date
+# ═════════════════════════════════════════════════════════════════════════════
+#  SMART CLEANUP — previous OneTap / SLSsteam installation
+# ═════════════════════════════════════════════════════════════════════════════
+SLS_DIR="$HOME_DIR/.local/share/SLSsteam"
+SLS_CFG_DIR="$HOME_DIR/.config/SLSsteam"
+APPS_DIR="$HOME_DIR/.local/share/applications"
 
-	info "Hammer update from ${BASE_URL}"
+onetap_present() {
+	[ -d "$SLS_DIR" ] && return 0
+	[ -d "$SLS_CFG_DIR" ] && return 0
+	[ -f "$APPS_DIR/steam-onetap.desktop" ] && return 0
+	# any patched steam binary referencing SLSsteam
+	for b in /usr/bin/steam-jupiter /usr/bin/steam /usr/local/bin/steam; do
+		[ -f "$b" ] && grep -q "SLSsteam" "$b" 2>/dev/null && return 0
+	done
+	# any steam.cfg that inhibits updates
+	for c in \
+		"$HOME_DIR/.steam/steam/steam.cfg" \
+		"$HOME_DIR/.steam/root/steam.cfg" \
+		"$HOME_DIR/.local/share/Steam/steam.cfg"; do
+		[ -f "$c" ] && grep -qi "BootStrapper" "$c" 2>/dev/null && return 0
+	done
+	return 1
+}
 
-	if steam_running; then
-		warn "Steam appears to be running."
-		warn "Close Steam first (Exit Steam), then run this script again."
-		warn "Continuing anyway in 5 seconds — Ctrl+C to cancel …"
-		sleep 5
+# Remove OneTap's Desktop-Mode unlock (.desktop entries + LD_AUDIT wrappers).
+onetap_remove_desktop_unlock() {
+	rm -f "$APPS_DIR/steam-onetap.desktop" 2>/dev/null && ok "Removed steam-onetap.desktop"
+	# OneTap PATH wrappers live under SLSsteam/path/
+	if [ -d "$SLS_DIR/path" ]; then
+		rm -rf "$SLS_DIR/path" 2>/dev/null && ok "Removed SLSsteam PATH wrappers"
 	fi
-
-	local tmp
-	tmp="$(mktemp -d "${TMPDIR:-/tmp}/hammer-update.XXXXXX")"
-	trap 'rm -rf "$tmp"' EXIT
-
-	download "${BASE_URL}/bin/hammersteam.so"   "$tmp/hammersteam.so"
-	download "${BASE_URL}/bin/library-inject.so" "$tmp/library-inject.so"
-	download "${BASE_URL}/config/config.yaml"   "$tmp/config.yaml"
-
-	# Basic sanity checks
-	[[ "$(wc -c < "$tmp/hammersteam.so")" -gt 1000000 ]] \
-		|| die "hammersteam.so looks too small — aborting."
-	file "$tmp/hammersteam.so" 2>/dev/null | grep -qi 'ELF' \
-		|| die "hammersteam.so is not an ELF file — aborting."
-
-	local stamp backup_dir
-	stamp="$(date +%Y%m%d-%H%M%S)"
-	backup_dir="$CONFIG_DIR/backups/update-$stamp"
-	mkdir -p "$HAMMER_DIR" "$CONFIG_DIR" "$backup_dir"
-
-	for f in "$HAMMER_SO" "$INJECT_SO"; do
-		if [[ -f "$f" ]]; then
-			cp -a "$f" "$backup_dir/"
-			info "Backed up $(basename "$f") → $backup_dir/"
+	# .desktop overrides patched by OneTap (reference SLSsteam). Our installer
+	# will recreate clean Hammer versions afterwards.
+	for d in steam.desktop steam-native.desktop; do
+		if [ -f "$APPS_DIR/$d" ] && grep -q "SLSsteam" "$APPS_DIR/$d" 2>/dev/null; then
+			rm -f "$APPS_DIR/$d" && ok "Removed OneTap-patched $d"
 		fi
 	done
+	# OneTap shell PATH snippet (fish)
+	rm -f "$HOME_DIR/.config/fish/conf.d/SLSsteam.fish" 2>/dev/null || true
+}
 
-	cp -f "$tmp/hammersteam.so"   "$HAMMER_SO"
-	cp -f "$tmp/library-inject.so" "$INJECT_SO"
-	chmod 0755 "$HAMMER_SO" "$INJECT_SO"
-
-	ok "Installed:"
-	ok "  $HAMMER_SO"
-	ok "  $INJECT_SO"
-
-	if [[ -f "$CONFIG_FILE" ]] && [[ "${FORCE_CONFIG:-0}" != "1" ]]; then
-		warn "Keeping your existing config.yaml"
-		warn "(only installed when missing — set FORCE_CONFIG=1 to overwrite)"
-	elif [[ -f "$CONFIG_FILE" ]]; then
-		cp -a "$CONFIG_FILE" "$backup_dir/"
-		info "Backed up config.yaml → $backup_dir/"
-		cp -f "$tmp/config.yaml" "$CONFIG_FILE"
-		chmod 0644 "$CONFIG_FILE"
-		ok "  $CONFIG_FILE (overwritten)"
+# Strip OneTap's LD_AUDIT (SLSsteam) lines from a steam launcher binary.
+_strip_sls_ld_audit() {
+	local bin="$1"
+	[ -f "$bin" ] || return 0
+	grep -q "SLSsteam" "$bin" 2>/dev/null || return 0
+	local tmp; tmp="$(mktemp)"
+	# Drop any line that sets LD_AUDIT to an SLSsteam path (with or without export).
+	grep -vE '^[[:space:]]*(export[[:space:]]+)?LD_AUDIT=.*SLSsteam' "$bin" > "$tmp" 2>/dev/null
+	if sudo install -m 0755 "$tmp" "$bin" 2>/dev/null; then
+		ok "Stripped OneTap LD_AUDIT from $bin"
 	else
-		cp -f "$tmp/config.yaml" "$CONFIG_FILE"
-		chmod 0644 "$CONFIG_FILE"
-		ok "  $CONFIG_FILE (new — working defaults for Steam build 1782257239)"
+		warn "Could not edit $bin (permission) — skipping."
 	fi
-	ok "Backups: $backup_dir"
+	rm -f "$tmp"
+}
 
-	if download "${BASE_URL}/VERSION.txt" "$tmp/VERSION.txt" 2>/dev/null; then
-		info "Package version:"
-		cat "$tmp/VERSION.txt"
+# Remove OneTap's Game-Mode unlock (steam-jupiter / steam).
+onetap_remove_gamemode_unlock() {
+	unlock_rootfs
+	# Prefer restoring OneTap's own backup if it exists.
+	local bak="$SLS_DIR/steam-jupiter.bak"
+	if [ -f "$bak" ]; then
+		local tgt; tgt="$(command -v steam-jupiter 2>/dev/null || echo /usr/bin/steam-jupiter)"
+		if [ -f "$tgt" ] && sudo install -m 0755 "$bak" "$tgt" 2>/dev/null; then
+			ok "Restored $tgt from OneTap backup"
+		fi
 	fi
+	for b in /usr/bin/steam-jupiter /usr/bin/steam /usr/local/bin/steam; do
+		_strip_sls_ld_audit "$b"
+	done
+}
 
-	echo
-	ok "Done. Restart Steam to load the new hammersteam.so."
+# Remove steam.cfg so Steam can auto-update again.
+onetap_remove_steam_cfg() {
+	local removed=0
+	for c in \
+		"$HOME_DIR/.steam/steam/steam.cfg" \
+		"$HOME_DIR/.steam/root/steam.cfg" \
+		"$HOME_DIR/.local/share/Steam/steam.cfg" \
+		"$HOME_DIR/.var/app/com.valvesoftware.Steam/.local/share/Steam/steam.cfg"; do
+		if [ -f "$c" ]; then
+			rm -f "$c" && { ok "Removed $c (Steam auto-update re-enabled)"; removed=1; }
+		fi
+	done
+	[ "$removed" = 0 ] && info "No steam.cfg found — Steam updates already enabled."
+}
+
+onetap_remove_data() {
+	[ -d "$SLS_DIR" ]     && rm -rf "$SLS_DIR"     && ok "Removed $SLS_DIR"
+	[ -d "$SLS_CFG_DIR" ] && rm -rf "$SLS_CFG_DIR" && ok "Removed $SLS_CFG_DIR"
+	rm -f "$HOME_DIR/.SLSsteam.log" 2>/dev/null || true
+}
+
+smart_cleanup() {
+	title "Smart cleanup — previous OneTap install"
+	if ! onetap_present; then
+		ok "No previous OneTap / SLSsteam install detected — clean machine."
+		return 0
+	fi
+	warn "Existing OneTap / SLSsteam install found — removing it first."
+	stop_steam
+	onetap_remove_gamemode_unlock
+	onetap_remove_desktop_unlock
+	onetap_remove_steam_cfg
+	onetap_remove_data
+	ok "OneTap fully removed. Steam updates re-enabled."
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  DOWNLOAD BUNDLE → Downloads/
+# ═════════════════════════════════════════════════════════════════════════════
+download_bundle() {
+	title "Download ValveOFF bundle → $DEST"
+	local tmp="$DL_DIR/.$BUNDLE_FILE.part"
+	rm -f "$tmp" 2>/dev/null || true
+	info "Source: $BUNDLE_URL"
+	info "This is a large download (~280 MB) — please wait."
+	if ! curl -fL --retry 3 --retry-delay 2 -o "$tmp" "$BUNDLE_URL"; then
+		die "Download failed. Check your internet / the bundle URL and try again."
+	fi
+	info "Extracting…"
+	rm -rf "$DEST" 2>/dev/null || true
+	if ! tar -xzf "$tmp" -C "$DL_DIR"; then
+		rm -f "$tmp"
+		die "Extraction failed (corrupt download?). Re-run to retry."
+	fi
+	rm -f "$tmp"
+	[ -f "$DEST/install.sh" ] || die "Bundle extracted but install.sh not found at $DEST — bundle layout unexpected."
+	chmod +x "$DEST/install.sh" 2>/dev/null || true
+	ok "Bundle ready at: $DEST"
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  DECKY LOADER (latest)
+# ═════════════════════════════════════════════════════════════════════════════
+decky_installed() {
+	[ -d "$HOME_DIR/homebrew/services" ] || [ -f "$HOME_DIR/homebrew/services/PluginLoader" ] \
+		|| systemctl is-active plugin_loader >/dev/null 2>&1
+}
+install_decky() {
+	title "Decky Loader (latest)"
+	if decky_installed; then
+		ok "Decky Loader already installed — skipping."
+		return 0
+	fi
+	info "Installing Decky Loader (official release installer)…"
+	if curl -fsSL "https://github.com/SteamDeckHomebrew/decky-installer/releases/latest/download/install_release.sh" | sh; then
+		ok "Decky Loader installed."
+	else
+		warn "Decky Loader install returned an error."
+		warn "  hammer-decky may not load in Game Mode until Decky is installed."
+		warn "  You can retry later from Konsole:"
+		warn "    curl -L https://github.com/SteamDeckHomebrew/decky-installer/releases/latest/download/install_release.sh | sh"
+	fi
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  HAMMER + VALVEOFF + HAMMER-DECKY (via bundle install.sh) + GAME-MODE UNLOCK
+# ═════════════════════════════════════════════════════════════════════════════
+install_core() {
+	title "Install Hammer + ValveOFF + hammer-decky + Desktop unlock"
+	# install.sh resolves its own paths; run from the bundle dir.
+	( cd "$DEST" && bash ./install.sh install ) \
+		|| warn "Core install reported a non-zero exit — see messages above."
+}
+
+apply_gamemode_unlock() {
+	title "Game-Mode unlock"
+	if [ "$IS_STEAMOS" = 1 ]; then
+		info "SteamOS → patching /usr/bin/steam-jupiter."
+		( cd "$DEST" && bash ./install.sh gamemode-install )
+	elif [ "$IS_ATOMIC" = 1 ] || [ "$IS_BAZZITE" = 1 ]; then
+		info "Bazzite/atomic → dropping /usr/local/bin/steam wrapper."
+		( cd "$DEST" && bash ./install.sh bazzite-install )
+	else
+		warn "Generic Linux: no Game-Mode patch applied (Desktop-Mode unlock is active)."
+		info "  For Flatpak Steam, run later:  cd \"$DEST\" && ./install.sh flatpak-install"
+	fi
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  MAIN
+# ═════════════════════════════════════════════════════════════════════════════
+main() {
+	title "ValveOFF one-paste installer"
+	info "User: $USER_NAME    Home: $HOME_DIR"
+	info "Downloads: $DL_DIR"
+	detect_distro
+	prime_sudo
+
+	smart_cleanup
+	download_bundle
+	install_decky
+	install_core
+	apply_gamemode_unlock
+	relock_rootfs
+
+	title "${C_B}DONE${C_RST}"
+	cat <<EOF
+
+  ValveOFF is installed. Final manual step (one time):
+
+  ${C_B}1.${C_RST} Launch Steam in Desktop Mode (let it update if it wants — that's fine).
+  ${C_B}2.${C_RST} Run ValveOFF once to activate your license:
+         "$DEST/ValveOFF"
+       (or from the KDE menu) — this writes the device-bound activation
+       that hammer-decky needs for Game Mode.
+  ${C_B}3.${C_RST} Switch to Game Mode → quick-access menu (•••) → Hammer Library.
+
+  Bundle / re-run / uninstall:
+       cd "$DEST"
+       ./install.sh status       # what's installed
+       ./install.sh verify       # did Hammer load in Desktop Mode?
+       ./install.sh uninstall    # remove everything (keeps config)
+
+  Salamat! Enjoy ValveOFF.
+EOF
 }
 
 main "$@"
