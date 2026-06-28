@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# update-hammer.sh — download latest Hammer binaries + config from GitHub
-# and install them to the standard Hammer paths on Steam Deck / Linux.
+# update-hammer.sh — download latest hammersteam.so, library-inject.so, config.yaml
+# from GitHub and install to standard Hammer paths (Steam Deck / Linux).
 #
-# Usage:
+# Upload newer files to:
+#   https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/main/bin
+#   https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/main/config
+#
+# One-paste update (close Steam first):
 #   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer.sh | bash
-#   # or after cloning:
-#   ./update-hammer.sh
+#
+# Keep your local config.yaml (only update the .so files):
+#   KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer.sh | bash
 #
 set -euo pipefail
 
@@ -107,19 +112,17 @@ main() {
 	ok "  $HAMMER_SO"
 	ok "  $INJECT_SO"
 
-	if [[ -f "$CONFIG_FILE" ]] && [[ "${FORCE_CONFIG:-0}" != "1" ]]; then
-		warn "Keeping your existing config.yaml"
-		warn "(only installed when missing — set FORCE_CONFIG=1 to overwrite)"
-	elif [[ -f "$CONFIG_FILE" ]]; then
-		cp -a "$CONFIG_FILE" "$backup_dir/"
-		info "Backed up config.yaml → $backup_dir/"
-		cp -f "$tmp/config.yaml" "$CONFIG_FILE"
-		chmod 0644 "$CONFIG_FILE"
-		ok "  $CONFIG_FILE (overwritten)"
+	# config.yaml — always update from GitHub (with backup). Set KEEP_CONFIG=1 to skip.
+	if [[ -f "$CONFIG_FILE" ]] && [[ "${KEEP_CONFIG:-0}" = "1" ]]; then
+		warn "KEEP_CONFIG=1 — leaving your existing config.yaml untouched."
 	else
+		if [[ -f "$CONFIG_FILE" ]]; then
+			cp -a "$CONFIG_FILE" "$backup_dir/"
+			info "Backed up config.yaml → $backup_dir/"
+		fi
 		cp -f "$tmp/config.yaml" "$CONFIG_FILE"
 		chmod 0644 "$CONFIG_FILE"
-		ok "  $CONFIG_FILE (new — working defaults for Steam build 1782257239)"
+		ok "  $CONFIG_FILE"
 	fi
 	ok "Backups: $backup_dir"
 

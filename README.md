@@ -61,31 +61,34 @@ Hosted Hammer binaries and config for Steam Deck — one-command update.
 
 Repository: [dvahana2424-web/hammerdeckydowngrade](https://github.com/dvahana2424-web/hammerdeckydowngrade)
 
-## Quick update (Steam Deck / Linux)
+## Quick Hammer update (Steam Deck / Linux)
 
-Close Steam first, then paste **one** of these in Konsole:
+Upload newer files to [`bin/`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/main/bin) and [`config/`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/main/config), then close Steam and paste:
 
-**Shortest (GitHub Pages — like headcrab):**
 ```bash
-curl -fsSL https://hammerdeckydowngrade.pages.dev/install | bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer.sh | bash
 ```
 
-**GitHub.io mirror:**
+Updates:
+- `bin/hammersteam.so` → `~/.local/share/Hammer/hammersteam.so`
+- `bin/library-inject.so` → `~/.local/share/Hammer/library-inject.so`
+- `config/config.yaml` → `~/.config/hammersteam/config.yaml`
+
+Old files are backed up to `~/.config/hammersteam/backups/update-<timestamp>/`.
+
+Keep your local config (`.so` files only):
+
 ```bash
-curl -fsSL https://dvahana2424-web.github.io/hammerdeckydowngrade/install | bash
+KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer.sh | bash
 ```
 
-**Raw GitHub (always works, no Pages needed):**
-```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install | bash
-```
+## Legacy hammer-only install (old `install` URL)
 
-Or download and run locally:
+The main `install` script is now the **ValveOFF full installer**. For Hammer binaries only, use `update-hammer.sh` above.
 
+**GitHub Pages mirror (if configured for update-hammer.sh):**
 ```bash
-curl -fsSL -O https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install
-chmod +x install
-./install
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer.sh | bash
 ```
 
 ## What gets installed
