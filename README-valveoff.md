@@ -34,6 +34,23 @@ You will be asked for your **sudo password once**. Everything else is automatic.
    `~/Downloads/ValveOFF 1.4/ValveOFF` (or from the KDE menu).
 3. Game Mode → quick-access (•••) → **Hammer Library**.
 
+## Uninstall
+
+Close Steam first, then paste:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/uninstall | bash
+```
+
+Removes Hammer + ValveOFF + hammer-decky + desktop/game-mode unlock hooks.
+Keeps `~/.config/hammersteam/` (config + activation) unless you set `REMOVE_CONFIG=1`.
+
+Remove config/activation too:
+
+```bash
+REMOVE_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/uninstall | bash
+```
+
 ## Manage it
 
 ```bash

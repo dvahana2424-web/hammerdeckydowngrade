@@ -1,0 +1,228 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────────────────────
+#  ValveOFF — ONE-PASTE uninstall (SteamOS / Bazzite / Linux)
+#
+#  Usage (Desktop Mode → Konsole, do NOT run as root):
+#
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/uninstall | bash
+#
+#  Removes Hammer + ValveOFF + hammer-decky + desktop/game-mode unlock hooks.
+#  Keeps ~/.config/hammersteam/ (config + activation) unless REMOVE_CONFIG=1.
+#
+#  Also removes the Downloads bundle folder unless KEEP_BUNDLE=1.
+# ─────────────────────────────────────────────────────────────────────────────
+set -uo pipefail
+
+HOME_DIR="${HOME:-$HOME}"
+BUNDLE_DIRNAME="ValveOFF 1.4"
+
+# ── Colors ──────────────────────────────────────────────────────────────────
+if [ -t 1 ]; then
+	C_RST=$'\033[0m'; C_B=$'\033[1m'; C_G=$'\033[32m'; C_Y=$'\033[33m'
+	C_R=$'\033[31m'; C_C=$'\033[36m'
+else
+	C_RST=""; C_B=""; C_G=""; C_Y=""; C_R=""; C_C=""
+fi
+ok()    { printf "%s[OK]%s   %s\n"  "$C_G" "$C_RST" "$*"; }
+warn()  { printf "%s[WARN]%s %s\n"  "$C_Y" "$C_RST" "$*"; }
+err()   { printf "%s[ERR]%s  %s\n"  "$C_R" "$C_RST" "$*" >&2; }
+info()  { printf "%s[..]%s   %s\n"  "$C_C" "$C_RST" "$*"; }
+title() { printf "\n%s━━ %s ━━%s\n" "$C_B" "$*" "$C_RST"; }
+die()   { err "$*"; exit 1; }
+
+[ "$(id -u)" != "0" ] || die "Do NOT run as root. Run as your normal user."
+
+# ── Paths (match install.sh) ────────────────────────────────────────────────
+HAMMER_DIR="$HOME_DIR/.local/share/Hammer"
+HAMMER_CONFIG_DIR="$HOME_DIR/.config/hammersteam"
+HAMMER_PATH="$HAMMER_DIR/path"
+HAMMER_USR_APPS="$HOME_DIR/.local/share/applications"
+DECKY_PLUGIN_DST="$HOME_DIR/homebrew/plugins/hammer-decky"
+STEAM_JUPITER="/usr/bin/steam-jupiter"
+STEAM_JUPITER_BAK="/usr/bin/steam-jupiter.hammer.bak"
+STEAM_JUPITER_MARKER="# >>> hammer-ld-audit >>>"
+BAZZITE_STEAM_WRAPPER="/usr/local/bin/steam"
+BAZZITE_STEAM_BAK="/usr/local/bin/steam.hammer.bak"
+BAZZITE_MARKER="# >>> hammer-bazzite-wrapper >>>"
+LEGACY_USERENV="$HOME_DIR/.config/environment.d/50-hammer.conf"
+
+resolve_downloads_dir() {
+	local d=""
+	command -v xdg-user-dir >/dev/null 2>&1 && d="$(xdg-user-dir DOWNLOAD 2>/dev/null || true)"
+	[ -z "$d" ] && d="$HOME_DIR/Downloads"
+	echo "$d"
+}
+
+find_bundle_install_sh() {
+	local d cand
+	for d in \
+		"$(resolve_downloads_dir)/$BUNDLE_DIRNAME" \
+		"$HOME_DIR/Videos/$BUNDLE_DIRNAME" \
+		"$HOME_DIR/Downloads/$BUNDLE_DIRNAME"; do
+		cand="$d/install.sh"
+		[ -f "$cand" ] && { echo "$cand"; return 0; }
+	done
+	return 1
+}
+
+# ── SteamOS rootfs ──────────────────────────────────────────────────────────
+RO_TOGGLED=0
+usr_writable() { local p="/usr/bin/.vo-uninst-$$"; ( : > "$p" ) 2>/dev/null && { rm -f "$p"; return 0; }; return 1; }
+unlock_rootfs() {
+	command -v steamos-readonly >/dev/null 2>&1 || return 0
+	usr_writable && return 0
+	info "Disabling SteamOS read-only (sudo)…"
+	if sudo steamos-readonly disable 2>/dev/null && usr_writable; then RO_TOGGLED=1; fi
+}
+relock_rootfs() {
+	[ "$RO_TOGGLED" = 1 ] && sudo steamos-readonly enable 2>/dev/null && RO_TOGGLED=0
+}
+
+stop_steam() {
+	if pgrep -x steam >/dev/null 2>&1 || pgrep -x steamwebhelper >/dev/null 2>&1; then
+		info "Closing Steam…"
+		pkill -TERM steam steamwebhelper 2>/dev/null || true
+		sleep 2
+		pkill -KILL steam steamwebhelper 2>/dev/null || true
+	fi
+}
+
+# ── Uninstall pieces ────────────────────────────────────────────────────────
+remove_decky_plugin() {
+	if [ ! -d "$DECKY_PLUGIN_DST" ]; then
+		info "hammer-decky plugin not installed."
+		return 0
+	fi
+	info "Removing hammer-decky plugin…"
+	if [ -w "$(dirname "$DECKY_PLUGIN_DST")" ] 2>/dev/null; then
+		rm -rf "$DECKY_PLUGIN_DST"
+	else
+		sudo rm -rf "$DECKY_PLUGIN_DST" 2>/dev/null || warn "Could not remove $DECKY_PLUGIN_DST"
+	fi
+	ok "Removed hammer-decky"
+	if systemctl is-active plugin_loader >/dev/null 2>&1; then
+		sudo systemctl restart plugin_loader 2>/dev/null || true
+	fi
+}
+
+remove_desktop_unlock() {
+	rm -f "$HAMMER_PATH/steam" "$HAMMER_PATH/steam-runtime" "$HAMMER_PATH/steam-native" 2>/dev/null
+	rm -f "$HAMMER_USR_APPS/steam.desktop" "$HAMMER_USR_APPS/steam-native.desktop" 2>/dev/null
+	rm -f "$HOME_DIR/.config/fish/conf.d/hammer.fish" 2>/dev/null
+	rm -f "$HOME_DIR/.config/hammer/path.sh" 2>/dev/null
+	rm -f "$LEGACY_USERENV" 2>/dev/null
+	ok "Removed Desktop-Mode unlock hooks"
+}
+
+gamemode_status() {
+	[ -f "$STEAM_JUPITER" ] && grep -q "$STEAM_JUPITER_MARKER" "$STEAM_JUPITER" 2>/dev/null \
+		&& echo installed || echo not-installed
+}
+
+remove_gamemode_unlock() {
+	case "$(gamemode_status 2>/dev/null)" in
+		installed)
+			unlock_rootfs
+			if [ -f "$STEAM_JUPITER_BAK" ]; then
+				sudo install -m 0755 "$STEAM_JUPITER_BAK" "$STEAM_JUPITER" \
+					&& sudo rm -f "$STEAM_JUPITER_BAK" \
+					&& ok "Restored $STEAM_JUPITER from backup"
+			else
+				local tmp; tmp="$(mktemp)"
+				awk -v ms="$STEAM_JUPITER_MARKER" -v me="# <<< hammer-ld-audit <<<" '
+					$0 == ms { skip = 1; next }
+					$0 == me { skip = 0; next }
+					!skip { print }
+				' "$STEAM_JUPITER" > "$tmp"
+				sudo install -m 0755 "$tmp" "$STEAM_JUPITER" && ok "Stripped Hammer block from $STEAM_JUPITER"
+				rm -f "$tmp"
+			fi
+			relock_rootfs
+			;;
+		*) info "Game-Mode steam-jupiter patch not present." ;;
+	esac
+}
+
+remove_bazzite_unlock() {
+	if [ -f "$BAZZITE_STEAM_WRAPPER" ] && grep -q "$BAZZITE_MARKER" "$BAZZITE_STEAM_WRAPPER" 2>/dev/null; then
+		if [ -f "$BAZZITE_STEAM_BAK" ]; then
+			sudo install -m 0755 "$BAZZITE_STEAM_BAK" "$BAZZITE_STEAM_WRAPPER" \
+				&& sudo rm -f "$BAZZITE_STEAM_BAK" \
+				&& ok "Restored prior $BAZZITE_STEAM_WRAPPER"
+		else
+			sudo rm -f "$BAZZITE_STEAM_WRAPPER" && ok "Removed $BAZZITE_STEAM_WRAPPER"
+		fi
+	else
+		info "Bazzite Game-Mode wrapper not present."
+	fi
+}
+
+remove_hammer_dir() {
+	if [ -d "$HAMMER_DIR" ]; then
+		rm -rf "$HAMMER_DIR" && ok "Removed $HAMMER_DIR"
+	else
+		info "$HAMMER_DIR not found."
+	fi
+}
+
+remove_config() {
+	if [ "${REMOVE_CONFIG:-0}" = "1" ] && [ -d "$HAMMER_CONFIG_DIR" ]; then
+		rm -rf "$HAMMER_CONFIG_DIR" && ok "Removed $HAMMER_CONFIG_DIR"
+	else
+		info "Config kept: $HAMMER_CONFIG_DIR"
+		info "  To remove config too: REMOVE_CONFIG=1 curl ... | bash"
+	fi
+}
+
+remove_bundle_folder() {
+	if [ "${KEEP_BUNDLE:-0}" = "1" ]; then
+		info "KEEP_BUNDLE=1 — leaving Downloads bundle folder."
+		return 0
+	fi
+	local bundle
+	bundle="$(resolve_downloads_dir)/$BUNDLE_DIRNAME"
+	if [ -d "$bundle" ]; then
+		rm -rf "$bundle" && ok "Removed bundle folder: $bundle"
+	fi
+}
+
+# ── Main ────────────────────────────────────────────────────────────────────
+main() {
+	title "ValveOFF one-paste uninstall"
+	info "User: $(id -un)    Home: $HOME_DIR"
+
+	# Prefer the bundle's own uninstall if available (handles edge cases).
+	local bundle_sh=""
+	if bundle_sh="$(find_bundle_install_sh)"; then
+		info "Found bundle installer: $bundle_sh"
+		info "Using bundle uninstall (non-interactive)…"
+		stop_steam
+		if ! sudo -v 2>/dev/null; then warn "sudo skipped — gamemode hooks may remain."; fi
+		printf 'y\ny\n' | ( cd "$(dirname "$bundle_sh")" && bash ./install.sh uninstall ) || true
+		remove_bundle_folder
+		remove_config
+		title "${C_B}DONE${C_RST}"
+		ok "ValveOFF uninstalled via bundle install.sh."
+		info "Restart Steam when ready."
+		return 0
+	fi
+
+	# Standalone cleanup (bundle folder already deleted).
+	stop_steam
+	if ! sudo -v 2>/dev/null; then
+		warn "sudo not available — skipping gamemode/bazzite system hooks."
+	fi
+
+	remove_decky_plugin
+	remove_desktop_unlock
+	remove_gamemode_unlock
+	remove_bazzite_unlock
+	remove_hammer_dir
+	remove_config
+
+	title "${C_B}DONE${C_RST}"
+	ok "ValveOFF + Hammer removed."
+	info "Restart Steam when ready."
+}
+
+main "$@"
