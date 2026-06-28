@@ -290,23 +290,33 @@ download_bundle() {
 #  DECKY LOADER (latest)
 # ═════════════════════════════════════════════════════════════════════════════
 decky_installed() {
-	[ -d "$HOME_DIR/homebrew/services" ] || [ -f "$HOME_DIR/homebrew/services/PluginLoader" ] \
-		|| systemctl is-active plugin_loader >/dev/null 2>&1
+	# Require the actual PluginLoader binary. A leftover ~/homebrew/services/
+	# directory from an old/partial install must NOT skip a fresh Decky install.
+	[ -x "$HOME_DIR/homebrew/services/PluginLoader" ] && return 0
+	return 1
 }
 install_decky() {
 	title "Decky Loader (latest)"
-	if decky_installed; then
+	if [ "${FORCE_DECKY:-0}" != "1" ] && decky_installed; then
 		ok "Decky Loader already installed — skipping."
+		info "  To force reinstall/upgrade: FORCE_DECKY=1 curl .../install | bash"
 		return 0
 	fi
 	info "Installing Decky Loader (official release installer)…"
 	if curl -fsSL "https://github.com/SteamDeckHomebrew/decky-installer/releases/latest/download/install_release.sh" | sh; then
 		ok "Decky Loader installed."
+		if [ -x "$HOME_DIR/homebrew/services/PluginLoader" ]; then
+			sudo systemctl restart plugin_loader 2>/dev/null \
+				&& ok "Restarted plugin_loader." \
+				|| warn "Restart plugin_loader manually: sudo systemctl restart plugin_loader"
+		else
+			warn "PluginLoader binary not found after install — check Decky installer output."
+		fi
 	else
 		warn "Decky Loader install returned an error."
 		warn "  hammer-decky may not load in Game Mode until Decky is installed."
-		warn "  You can retry later from Konsole:"
-		warn "    curl -L https://github.com/SteamDeckHomebrew/decky-installer/releases/latest/download/install_release.sh | sh"
+		warn "  Retry manually:"
+		warn "    curl -fsSL https://github.com/SteamDeckHomebrew/decky-installer/releases/latest/download/install_release.sh | sh"
 	fi
 }
 
