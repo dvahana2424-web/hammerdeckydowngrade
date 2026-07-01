@@ -92,6 +92,22 @@ Keep your local config (`.so` files only):
 KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer.sh | bash
 ```
 
+## Update hammer-decky plugin only (v0.9.12+)
+
+After a SteamOS update, if the AppID input box stops working, update the plugin from `main`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer-decky.sh | bash
+```
+
+Or manually:
+
+```bash
+git clone --depth 1 https://github.com/dvahana2424-web/hammerdeckydowngrade.git /tmp/hdd
+cp -a /tmp/hdd/hammer-decky/. ~/homebrew/plugins/hammer-decky/
+sudo systemctl restart plugin_loader
+```
+
 ## Legacy hammer-only install (old `install` URL)
 
 The main `install` script is now the **ValveOFF full installer**. For Hammer binaries only, use `update-hammer.sh` above.

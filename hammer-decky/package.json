@@ -1,0 +1,33 @@
+{
+    "name": "hammer-decky",
+    "version": "0.9.12",
+    "description": "Hammer Library Decky plugin — ValveOFF 1.4 CLI bridge, Game Mode license delegation, cart batch add, Steam restart UX.",
+    "scripts": {
+        "build": "shx rm -rf dist && rollup -c",
+        "watch": "rollup -c -w"
+    },
+    "keywords": ["decky-loader", "decky", "steam-deck", "hammer", "valveoff"],
+    "author": "Hammer Project",
+    "license": "MIT",
+    "type": "module",
+    "devDependencies": {
+        "@decky/api": "^1.1.2",
+        "@decky/rollup": "^1.0.1",
+        "@decky/ui": "^4.10.3",
+        "@rollup/plugin-commonjs": "^25.0.7",
+        "@rollup/plugin-json": "^6.1.0",
+        "@rollup/plugin-node-resolve": "^15.2.3",
+        "@rollup/plugin-replace": "^5.0.5",
+        "@rollup/plugin-typescript": "^11.1.6",
+        "@types/react": "16.14.0",
+        "@types/webpack": "^5.28.5",
+        "react": "16.14.0",
+        "react-icons": "^5.0.1",
+        "rollup": "^4.9.6",
+        "rollup-plugin-import-assets": "^1.1.1",
+        "shx": "^0.3.4",
+        "tslib": "^2.6.2",
+        "typescript": "^5.3.3"
+    },
+    "dependencies": {}
+}

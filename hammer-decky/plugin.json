@@ -1,0 +1,11 @@
+{
+    "name": "Hammer Library",
+    "author": "Hammer Project",
+    "flags": [],
+    "api_version": 1,
+    "publish": {
+        "tags": ["library", "steam-deck", "tools"],
+        "description": "Add games to your Steam library from Game Mode. Spawns ValveOFF --cli to deploy .hammer keys, then Steam restart. Requires ValveOFF 1.4+ on the device.",
+        "image": ""
+    }
+}
