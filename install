@@ -330,6 +330,70 @@ install_core() {
 		|| warn "Core install reported a non-zero exit — see messages above."
 }
 
+# Always overlay hammer-decky from main after the bundle install.
+# The release tarball can lag behind main; v0.9.12 shipped a broken dist
+# (React.createElement instead of SP_JSX) that crashes Decky QAM in Game Mode.
+install_hammer_decky_latest() {
+	title "hammer-decky (latest from main)"
+	local base="https://raw.githubusercontent.com/${REPO}/main"
+	local dst="$HOME_DIR/homebrew/plugins/hammer-decky"
+	local tmp; tmp="$(mktemp -d "${TMPDIR:-/tmp}/hammer-decky.XXXXXX")"
+
+	if ! decky_installed; then
+		warn "Decky Loader not installed — skipping hammer-decky overlay."
+		rm -rf "$tmp"
+		return 0
+	fi
+
+	info "Downloading hammer-decky v0.9.13+ from main branch …"
+	for f in main.py plugin.json package.json README.md; do
+		curl -fsSL "${base}/hammer-decky/${f}" -o "${tmp}/${f}" \
+			|| { warn "Failed to download hammer-decky/${f}"; rm -rf "$tmp"; return 1; }
+	done
+	mkdir -p "${tmp}/dist"
+	curl -fsSL "${base}/hammer-decky/dist/index.js" -o "${tmp}/dist/index.js" \
+		|| { warn "Failed to download hammer-decky/dist/index.js"; rm -rf "$tmp"; return 1; }
+	curl -fsSL "${base}/hammer-decky/dist/index.js.map" -o "${tmp}/dist/index.js.map" 2>/dev/null || true
+	chmod 0755 "${tmp}/main.py"
+
+	if grep -q 'React\.createElement' "${tmp}/dist/index.js" 2>/dev/null; then
+		warn "Downloaded hammer-decky dist still uses React.createElement — refusing to install broken build."
+		rm -rf "$tmp"
+		return 1
+	fi
+
+	info "Installing to $dst …"
+	if [ -d "$dst" ] && [ ! -w "$dst" ]; then
+		sudo rm -rf "$dst"
+		sudo mkdir -p "$dst"
+		sudo cp -a "${tmp}/." "$dst/"
+		sudo chown -R "$USER_NAME:$(id -gn)" "$dst"
+	else
+		mkdir -p "$dst"
+		rm -rf "${dst:?}/"*
+		cp -a "${tmp}/." "$dst/"
+	fi
+	rm -rf "$tmp"
+
+	# Keep the extracted bundle in sync for manual ./install.sh decky-install reruns.
+	if [ -d "$DEST/hammer-decky" ]; then
+		rm -rf "${DEST:?}/hammer-decky"
+		mkdir -p "$DEST/hammer-decky/dist"
+		for f in main.py plugin.json package.json README.md; do
+			curl -fsSL "${base}/hammer-decky/${f}" -o "$DEST/hammer-decky/${f}" 2>/dev/null || true
+		done
+		curl -fsSL "${base}/hammer-decky/dist/index.js" -o "$DEST/hammer-decky/dist/index.js" 2>/dev/null || true
+		curl -fsSL "${base}/hammer-decky/dist/index.js.map" -o "$DEST/hammer-decky/dist/index.js.map" 2>/dev/null || true
+	fi
+
+	ok "hammer-decky updated from main ($(grep -o '"version": "[^"]*"' "$dst/package.json" | head -1))."
+	if systemctl is-active plugin_loader >/dev/null 2>&1; then
+		sudo systemctl restart plugin_loader 2>/dev/null \
+			&& ok "Restarted plugin_loader." \
+			|| warn "Restart manually: sudo systemctl restart plugin_loader"
+	fi
+}
+
 apply_gamemode_unlock() {
 	title "Game-Mode unlock"
 	if [ "$IS_STEAMOS" = 1 ]; then
@@ -358,6 +422,7 @@ main() {
 	download_bundle
 	install_decky
 	install_core
+	install_hammer_decky_latest
 	apply_gamemode_unlock
 	relock_rootfs
 

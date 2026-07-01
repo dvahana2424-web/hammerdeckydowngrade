@@ -33,6 +33,12 @@ if [ ! -f "${TMP}/dist/index.js" ] || [ ! -f "${TMP}/plugin.json" ]; then
 	exit 1
 fi
 
+if grep -q 'React\.createElement' "${TMP}/dist/index.js" 2>/dev/null; then
+	echo "[ERR] Downloaded dist uses React.createElement (broken on Decky 3.x)." >&2
+	echo "      Wait for v0.9.13+ on main or report upstream." >&2
+	exit 1
+fi
+
 echo "[..] Installing to ${PLUGIN_DST} …"
 if [ -d "${PLUGIN_DST}" ] && [ ! -w "${PLUGIN_DST}" ]; then
 	sudo rm -rf "${PLUGIN_DST}"
