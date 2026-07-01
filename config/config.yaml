@@ -42,11 +42,11 @@ ExtendedLogging: yes
 ManifestHookEnabled: yes
 ManifestPattern: "e8 ? ? ? ? 05 ? ? ? ? 55 89 e5 57 56 53 81 ec 10 01 00"
 GetManifestRequestCodeOffset: 0x1341890
-ManifestProvider: Ost
-ManifestFallbackProvider: yes
 ManifestLocalCacheFallback: yes
+ManifestServerUrl: "https://manifest.activateme.workers.dev"
 ManifestDepotAllowFromKeys: yes
 ManifestDepots: []
+ManifestHttpWorkerThreads: 4
 
 OwnershipTicketDiskFallback: no
 
@@ -55,7 +55,6 @@ UserOwnsDepotOffset: 0x185f1b0
 UserOwnsDepotPattern: "55 e8 ? ? ? ? 81 c5 ? ? ? ? 57 56 53 83 ec 74 ff b4 24"
 
 SteamlessAutoPatchEnabled: yes
-# SteamlessPatchEnabled: yes   # alias — same meaning as SteamlessAutoPatchEnabled
 SteamlessCliPath: "~/.config/hammersteam/SteamlessCLI"
 SteamlessCliTimeoutSeconds: 120
 SteamlessRecursiveScan: yes
