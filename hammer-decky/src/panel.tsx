@@ -39,11 +39,9 @@ import {
     PanelSection,
     PanelSectionRow,
     Spinner,
+    TextField,
 } from "@decky/ui";
 import { FC, useCallback, useEffect, useState } from "react";
-
-import { showAppIdInputModal } from "./appIdInputModal";
-import { AppIdDigitPad } from "./appIdDigitPad";
 
 import {
     cartAdd,
@@ -225,12 +223,6 @@ export const HammerLibraryPanel: FC = () => {
         },
         [refreshCart],
     );
-
-    const onOpenInputModal = useCallback(async () => {
-        if (busy) return;
-        const next = await showAppIdInputModal({ initial: input });
-        if (next != null) setInput(next);
-    }, [busy, input]);
 
     const onAddToCart = useCallback(async () => {
         if (!input.trim() || busy) return;
@@ -416,34 +408,14 @@ export const HammerLibraryPanel: FC = () => {
                 )}
 
                 <PanelSectionRow>
-                    <ButtonItem
-                        layout="below"
+                    <TextField
+                        label="AppID or Steam Store URL"
+                        value={input}
+                        onChange={(e) => setInput(e?.target?.value ?? "")}
+                        description="Or paste here. If the in-page banner isn't visible (e.g. on the Big Picture web store), use ADD THIS GAME above instead."
                         disabled={busy}
-                        onClick={() => void onOpenInputModal()}
-                    >
-                        <Focusable
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "flex-start",
-                                gap: "4px",
-                            }}
-                        >
-                            <span style={{ fontWeight: 700 }}>
-                                {input.trim()
-                                    ? "Edit AppID / Store URL"
-                                    : "Enter AppID or Store URL"}
-                            </span>
-                            <span style={{ fontSize: "12px", opacity: 0.8 }}>
-                                {input.trim()
-                                    ? input
-                                    : "Opens keyboard modal (Steam + X if keyboard missing)"}
-                            </span>
-                        </Focusable>
-                    </ButtonItem>
+                    />
                 </PanelSectionRow>
-
-                <AppIdDigitPad value={input} onChange={setInput} disabled={busy} />
 
                 <PanelSectionRow>
                     <ButtonItem

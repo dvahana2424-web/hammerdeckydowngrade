@@ -1,6 +1,6 @@
 {
     "name": "hammer-decky",
-    "version": "0.9.13",
+    "version": "0.9.14",
     "description": "Hammer Library Decky plugin — ValveOFF 1.4 CLI bridge, Game Mode license delegation, cart batch add, Steam restart UX.",
     "scripts": {
         "build": "shx rm -rf dist && rollup -c",

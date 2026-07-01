@@ -1142,76 +1142,6 @@ async function cleanupPoisoned() {
     return { ok: true, inspected: inspected.length, removed };
 }
 
-/**
- * AppID / Store URL entry via ConfirmModal.
- *
- * Inline PanelSection TextField stopped accepting keyboard input after
- * recent SteamOS / SteamUI updates — the OSK focus path only works
- * reliably inside a modal on Game Mode. This matches the pattern used
- * by other Decky plugins (ConfirmModal + Field + TextField).
- */
-
-
-const AppIdInputModalBody = ({ initial = "", onDone, closeModal, }) => {
-    const [val, setVal] = SP_REACT.useState(initial);
-    const finish = (value) => {
-        onDone(value);
-        closeModal?.();
-    };
-    return (SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "Enter AppID or Store URL", strDescription: "Paste a Steam store link or type a numeric AppID. " +
-            "If the keyboard does not appear, press Steam + X.", strOKButtonText: "Done", strCancelButtonText: "Cancel", bOKDisabled: !val.trim(), onOK: () => finish(val.trim()), onCancel: () => finish(null), closeModal: closeModal, children: SP_JSX.jsx(DFL.Field, { label: "AppID or Steam Store URL", children: SP_JSX.jsx(DFL.TextField, { value: val, onChange: (e) => setVal(e?.target?.value ?? ""), style: { width: "100%", minWidth: "220px" } }) }) }));
-};
-/** Open the input modal; resolves to trimmed text or null if cancelled. */
-function showAppIdInputModal(opts = {}) {
-    return new Promise((resolve) => {
-        let settled = false;
-        const settle = (v) => {
-            if (!settled) {
-                settled = true;
-                resolve(v);
-            }
-        };
-        DFL.showModal(SP_JSX.jsx(AppIdInputModalBody, { initial: opts.initial ?? "", onDone: settle }));
-    });
-}
-
-/**
- * Gamepad-friendly numeric AppID entry — no OS keyboard required.
- * Useful when SteamOS updates break inline TextField / on-screen keyboard.
- */
-
-const digitBtn = {
-    minWidth: "44px",
-    padding: "6px 10px",
-    fontWeight: 700,
-};
-const AppIdDigitPad = ({ value, onChange, disabled }) => {
-    const press = (d) => {
-        if (disabled)
-            return;
-        if (value.length >= 9)
-            return;
-        onChange(value + d);
-    };
-    const backspace = () => {
-        if (disabled || !value)
-            return;
-        onChange(value.slice(0, -1));
-    };
-    const clear = () => {
-        if (disabled)
-            return;
-        onChange("");
-    };
-    const digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
-    return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", flexDirection: "column", gap: "8px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { fontSize: "13px", opacity: 0.85 }, children: ["Numeric keypad (no keyboard needed):", " ", SP_JSX.jsx("span", { style: { fontWeight: 700 }, children: value || "—" })] }), SP_JSX.jsxs("div", { style: {
-                        display: "grid",
-                        gridTemplateColumns: "repeat(5, 1fr)",
-                        gap: "6px",
-                        width: "100%",
-                    }, children: [digits.map((d) => (SP_JSX.jsx(DFL.DialogButton, { disabled: disabled, onClick: () => press(d), style: digitBtn, children: d }, d))), SP_JSX.jsx(DFL.DialogButton, { disabled: disabled || !value, onClick: backspace, style: digitBtn, children: "\u232B" }), SP_JSX.jsx(DFL.DialogButton, { disabled: disabled || !value, onClick: clear, style: digitBtn, children: "CLR" })] })] }) }));
-};
-
 const CartResultsBody = ({ result, closeModal, onRestart }) => {
     const { results, successful, failed, cart_remaining, pending_count } = result;
     const anySucceeded = successful.length > 0;
@@ -1462,13 +1392,6 @@ const HammerLibraryPanel = () => {
             setBusy(false);
         }
     }, [refreshCart]);
-    const onOpenInputModal = SP_REACT.useCallback(async () => {
-        if (busy)
-            return;
-        const next = await showAppIdInputModal({ initial: input });
-        if (next != null)
-            setInput(next);
-    }, [busy, input]);
     const onAddToCart = SP_REACT.useCallback(async () => {
         if (!input.trim() || busy)
             return;
@@ -1587,16 +1510,7 @@ const HammerLibraryPanel = () => {
                                     fontWeight: 700,
                                 }, children: [SP_JSX.jsx(FaPlus, {}), detectedTitle
                                         ? `ADD THIS GAME — ${detectedTitle}`
-                                        : `ADD THIS GAME — AppID ${detection.appid}`] }) }) })), detection.appid != null && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Detected on current page", description: `AppID ${detection.appid}${detectedTitle ? ` · ${detectedTitle}` : " · (resolving title…)"}` }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: () => void onOpenInputModal(), children: SP_JSX.jsxs(DFL.Focusable, { style: {
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "flex-start",
-                                    gap: "4px",
-                                }, children: [SP_JSX.jsx("span", { style: { fontWeight: 700 }, children: input.trim()
-                                            ? "Edit AppID / Store URL"
-                                            : "Enter AppID or Store URL" }), SP_JSX.jsx("span", { style: { fontSize: "12px", opacity: 0.8 }, children: input.trim()
-                                            ? input
-                                            : "Opens keyboard modal (Steam + X if keyboard missing)" })] }) }) }), SP_JSX.jsx(AppIdDigitPad, { value: input, onChange: setInput, disabled: busy }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: busy || !input.trim() || health?.ok === false, onClick: () => void onAddToCart(), children: busy ? (SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsx(DFL.Spinner, { style: { width: 16, height: 16 } }), "Adding to cart\u2026"] })) : (SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsx(FaPlus, {}), "Add to cart"] })) }) }), statusLine && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Status", description: statusLine }) }))] }), SP_JSX.jsxs(DFL.PanelSection, { title: `Cart (${cart.count} item${cart.count === 1 ? "" : "s"})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: cart.count === 0
+                                        : `ADD THIS GAME — AppID ${detection.appid}`] }) }) })), detection.appid != null && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Detected on current page", description: `AppID ${detection.appid}${detectedTitle ? ` · ${detectedTitle}` : " · (resolving title…)"}` }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "AppID or Steam Store URL", value: input, onChange: (e) => setInput(e?.target?.value ?? ""), description: "Or paste here. If the in-page banner isn't visible (e.g. on the Big Picture web store), use ADD THIS GAME above instead.", disabled: busy }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: busy || !input.trim() || health?.ok === false, onClick: () => void onAddToCart(), children: busy ? (SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsx(DFL.Spinner, { style: { width: 16, height: 16 } }), "Adding to cart\u2026"] })) : (SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsx(FaPlus, {}), "Add to cart"] })) }) }), statusLine && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Status", description: statusLine }) }))] }), SP_JSX.jsxs(DFL.PanelSection, { title: `Cart (${cart.count} item${cart.count === 1 ? "" : "s"})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: cart.count === 0
                                 ? "Cart is empty"
                                 : `${cart.count} AppID${cart.count === 1 ? "" : "s"} ready to process`, description: cart.count === 0
                                 ? "Tap the in-page Add to Library button on a Steam app page (or paste an AppID above)."
@@ -1709,7 +1623,7 @@ const PanelWithCleanup = () => {
 };
 // ── Plugin definition ─────────────────────────────────────────────────────
 var index = definePlugin(() => {
-    console.log("[hammer-decky] plugin loaded (v0.9.13 — fix React/SP_REACT build for Decky 3.x QAM)");
+    console.log("[hammer-decky] plugin loaded (v0.9.14 — classic inline AppID field + SP_JSX build fix)");
     // Mount the in-page Add-to-Library button injector. Returns the
     // tear-down function used by `onDismount` so reinstalls / hot
     // reloads don't leave stray DOM hosts behind.

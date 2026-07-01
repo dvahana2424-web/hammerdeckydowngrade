@@ -85,7 +85,7 @@ const PanelWithCleanup = () => {
 
 export default definePlugin(() => {
     console.log(
-        "[hammer-decky] plugin loaded (v0.9.13 — fix React/SP_REACT build for Decky 3.x QAM)",
+        "[hammer-decky] plugin loaded (v0.9.14 — classic inline AppID field + SP_JSX build fix)",
     );
 
     // Mount the in-page Add-to-Library button injector. Returns the
