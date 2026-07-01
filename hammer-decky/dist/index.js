@@ -282,43 +282,6 @@ const FaPlus = shim(FaPlus$1);
 const FaSyncAlt = shim(FaSyncAlt$1);
 const FaTrash = shim(FaTrash$1);
 
-/**
- * Steam restart — 10-second confirmation modal.
- *
- * Hammer's GetSubscribedApps hook is only consulted by Steam when the
- * client does its initial "what does this user own?" handshake, i.e. at
- * Steam startup / login. So when ValveOFF drops a fresh `.hammer` file
- * into ~/.config/hammersteam/, the new AppID won't appear in the
- * library until the parent Steam process restarts and the hook fires
- * again. There is no live-refresh callback we can post from JS
- * (RestartUI() restarts only the renderer, which still reads the cached
- * subscribed-apps list from the parent), and the C++-side
- * LicensesUpdate_t fan-out path crashes Steam in spoofed-Steam mode
- * (see RECIPE.md "Why Hammer no longer fires AppLicensesChanged_t"
- * and src/feats/apps.cpp::announceNewAppIds).
- *
- * Therefore the only honest path is: do the add, then full-restart Steam.
- * To avoid yanking the carpet out from under the user (especially mid-
- * game in Game Mode), we wrap the restart in a 10-second confirmation
- * modal with a visible countdown and a hard Cancel button. If the user
- * does nothing, the restart fires automatically when the timer expires;
- * that auto-fire matches the "auto-restart" expectation users have from
- * Steam's own update-restart prompt.
- *
- * SteamClient surface used:
- *   SteamClient.User.StartRestart(bForceRestart=false)    primary
- *   SteamClient.User.StartShutdown(...)                   not what we want
- *   SteamClient.System.RestartUI()                        UI-only, NOT enough
- *
- * Some Steam builds expose StartRestart only behind an extra capability
- * argument; we probe at runtime to avoid hardcoding a signature that
- * might shift between client versions. If StartRestart is missing
- * entirely (it shouldn't be — every modern Big Picture / Game Mode
- * build has it), we fall back to the desktop-mode native restart
- * (`SteamClient.User.OpenURL("steam://exit") + relaunch`) which is
- * cosmetically uglier but functionally equivalent.
- */
-
 const DEFAULT_COUNTDOWN_SECONDS = 10;
 // ── Steam-side restart trigger ──────────────────────────────────────────────
 /**
@@ -391,7 +354,7 @@ const CountdownModal = ({ seconds, pendingCount, onConfirm, onCancel, closeModal
     const description = pendingCount > 0
         ? `Steam will restart in ${remaining}s to apply ${pendingCount} pending Hammer add${pendingCount === 1 ? "" : "s"}. Hammer's hook only refires at startup, so this is the only way for new games to appear in the library. Press Cancel if you'd rather restart later.`
         : `Steam will restart in ${remaining}s. Press Cancel if you'd rather restart later.`;
-    return (React.createElement(DFL.ConfirmModal, { strTitle: restarting
+    return (SP_JSX.jsx(DFL.ConfirmModal, { strTitle: restarting
             ? "Restarting Steam…"
             : `Restart Steam in ${remaining}s`, strDescription: restarting
             ? "Steam is going down now. Game Mode / Big Picture will reappear in a few seconds with your new game(s) in the library."
@@ -432,7 +395,7 @@ function startSteamRestartCountdown(opts = {}) {
                 resolve(v);
             }
         };
-        const result = DFL.showModal(React.createElement(CountdownModal, { seconds: seconds, pendingCount: pending, onConfirm: async () => {
+        const result = DFL.showModal(SP_JSX.jsx(CountdownModal, { seconds: seconds, pendingCount: pending, onConfirm: async () => {
                 try {
                     // Empty the pending queue BEFORE firing restart;
                     // the python process dies with Steam so we want
@@ -471,57 +434,6 @@ function startSteamRestartCountdown(opts = {}) {
     });
 }
 
-/**
- * In-page Add-to-Library button injector (v0.9.1).
- *
- * The Steam Store on Big Picture / Game Mode comes in two flavours, and
- * v0.9.0 of this plugin only handled one:
- *
- *   A. **Native React store route** — `/library/storeapp/:appid`
- *      (rendered by Steam's own React tree, accessed via clicking a
- *      game card in the library / from search results / etc.). The
- *      page title is a real `<h1>` we can find in the DOM.
- *
- *   B. **Embedded webview** — `/library/storefront` (or similar) with
- *      the actual `store.steampowered.com/app/<appid>/` page rendered
- *      inside a CEF child browser. The webview's DOM is in a SEPARATE
- *      security context that this React tree cannot reach. The page
- *      title visible to the user lives inside the iframe and is
- *      unreachable from our process.
- *
- * v0.9.0 did URL polling against `window.location.pathname` which
- * matched (A) but never (B), because in (B) the outer URL is just
- * `/library/storefront` — the AppID is buried inside the iframe's URL
- * which doesn't propagate up. The user's screenshot shows them stuck in
- * case (B) and seeing no button.
- *
- * v0.9.1 detects BOTH cases with three independent signals, and renders
- * a button when any of them produces an AppID:
- *
- *   1. `window.location` polling (still catches case A — fast path).
- *
- *   2. `SteamClient.URL.RegisterForSteamURLChanges` listener (Steam's
- *      own URL-change broadcaster — the same one its UI uses to react
- *      to the user typing a URL into the address bar). When this
- *      fires with a `https://store.steampowered.com/app/<appid>/`
- *      target, we know we're in case B regardless of what the outer
- *      React route says.
- *
- *   3. **DOM scrape of the address-bar element**. Big Picture renders
- *      the visible URL ("https://store.steampowered.com/app/...") as a
- *      regular text node in Steam's outer UI shell — NOT inside the
- *      iframe. We MutationObserver-watch document.body and pull the
- *      AppID out of any element whose textContent looks like a Steam
- *      store URL. Last-resort fallback for builds where the URL
- *      callback isn't wired or returns stale state.
- *
- * The button positioning logic is unchanged — try to find the page
- * title and portal beside it; failing that, render the floating banner
- * at top-center. But we now drop the fallback delay from 3s to 1.5s
- * so users in case B (where the title is unreachable by definition)
- * get the banner faster, and the banner itself is louder (red, bigger,
- * "ADD TO LIBRARY" all caps, with cart count badge).
- */
 // ── Route detection (case A: native Steam React store routes) ─────────────
 const APPID_ROUTE_PATTERNS = [
     /\/library\/storeapp\/(\d{1,9})(?:[/?#]|$)/i,
@@ -842,15 +754,10 @@ const AddButton = ({ appid, variant }) => {
         marginLeft: "4px",
         fontWeight: 500,
     };
-    return (React.createElement(DFL.Focusable, { style: baseStyle, onActivate: () => void onClick(), onClick: (e) => {
+    return (SP_JSX.jsxs(DFL.Focusable, { style: baseStyle, onActivate: () => void onClick(), onClick: (e) => {
             e?.stopPropagation?.();
             void onClick();
-        }, title: `Hammer Library — ${title || `AppID ${appid}`} (${phase})` },
-        React.createElement(Icon, { style: { flex: "0 0 auto" }, size: variant === "inline" ? 12 : 16 }),
-        React.createElement("span", null, label),
-        React.createElement("span", { style: subText },
-            "\u00B7 ",
-            title || `AppID ${appid}`)));
+        }, title: `Hammer Library — ${title || `AppID ${appid}`} (${phase})`, children: [SP_JSX.jsx(Icon, { style: { flex: "0 0 auto" }, size: variant === "inline" ? 12 : 16 }), SP_JSX.jsx("span", { children: label }), SP_JSX.jsxs("span", { style: subText, children: ["\u00B7 ", title || `AppID ${appid}`] })] }));
 };
 // ── TitleAnchoredButton ────────────────────────────────────────────────────
 const FALLBACK_DELAY_MS = 1500;
@@ -911,10 +818,10 @@ const TitleAnchoredButton = ({ appid }) => {
             setShowFallback(false);
     }, [host]);
     if (host) {
-        return SP_REACTDOM.createPortal(React.createElement(AddButton, { appid: appid, variant: "inline" }), host);
+        return SP_REACTDOM.createPortal(SP_JSX.jsx(AddButton, { appid: appid, variant: "inline" }), host);
     }
     if (showFallback) {
-        return React.createElement(AddButton, { appid: appid, variant: "floating" });
+        return SP_JSX.jsx(AddButton, { appid: appid, variant: "floating" });
     }
     return null;
 };
@@ -1093,7 +1000,7 @@ const InjectorController = () => {
     }, [appid]);
     if (appid == null)
         return null;
-    return React.createElement(TitleAnchoredButton, { key: appid, appid: appid });
+    return SP_JSX.jsx(TitleAnchoredButton, { appid: appid }, appid);
 };
 // ── installInjector: public mount/unmount API ──────────────────────────────
 const ROOT_ID = "hammer-decky-injector-root";
@@ -1107,7 +1014,7 @@ function installInjector() {
     root.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;pointer-events:none;";
     document.body.appendChild(root);
     try {
-        SP_REACTDOM.render(React.createElement(InjectorController, null), root);
+        SP_REACTDOM.render(SP_JSX.jsx(InjectorController, {}), root);
         console.log("[hammer-decky] injector mounted (v0.9.3 — always-live diagnostics + sync title resolve)");
     }
     catch (ex) {
@@ -1251,10 +1158,8 @@ const AppIdInputModalBody = ({ initial = "", onDone, closeModal, }) => {
         onDone(value);
         closeModal?.();
     };
-    return (React.createElement(DFL.ConfirmModal, { strTitle: "Enter AppID or Store URL", strDescription: "Paste a Steam store link or type a numeric AppID. " +
-            "If the keyboard does not appear, press Steam + X.", strOKButtonText: "Done", strCancelButtonText: "Cancel", bOKDisabled: !val.trim(), onOK: () => finish(val.trim()), onCancel: () => finish(null), closeModal: closeModal },
-        React.createElement(DFL.Field, { label: "AppID or Steam Store URL" },
-            React.createElement(DFL.TextField, { value: val, onChange: (e) => setVal(e?.target?.value ?? ""), style: { width: "100%", minWidth: "220px" } }))));
+    return (SP_JSX.jsx(DFL.ConfirmModal, { strTitle: "Enter AppID or Store URL", strDescription: "Paste a Steam store link or type a numeric AppID. " +
+            "If the keyboard does not appear, press Steam + X.", strOKButtonText: "Done", strCancelButtonText: "Cancel", bOKDisabled: !val.trim(), onOK: () => finish(val.trim()), onCancel: () => finish(null), closeModal: closeModal, children: SP_JSX.jsx(DFL.Field, { label: "AppID or Steam Store URL", children: SP_JSX.jsx(DFL.TextField, { value: val, onChange: (e) => setVal(e?.target?.value ?? ""), style: { width: "100%", minWidth: "220px" } }) }) }));
 };
 /** Open the input modal; resolves to trimmed text or null if cancelled. */
 function showAppIdInputModal(opts = {}) {
@@ -1266,7 +1171,7 @@ function showAppIdInputModal(opts = {}) {
                 resolve(v);
             }
         };
-        DFL.showModal(React.createElement(AppIdInputModalBody, { initial: opts.initial ?? "", onDone: settle }));
+        DFL.showModal(SP_JSX.jsx(AppIdInputModalBody, { initial: opts.initial ?? "", onDone: settle }));
     });
 }
 
@@ -1299,146 +1204,90 @@ const AppIdDigitPad = ({ value, onChange, disabled }) => {
         onChange("");
     };
     const digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
-    return (React.createElement(DFL.PanelSectionRow, null,
-        React.createElement(DFL.Focusable, { style: { display: "flex", flexDirection: "column", gap: "8px", width: "100%" } },
-            React.createElement("div", { style: { fontSize: "13px", opacity: 0.85 } },
-                "Numeric keypad (no keyboard needed):",
-                " ",
-                React.createElement("span", { style: { fontWeight: 700 } }, value || "—")),
-            React.createElement("div", { style: {
-                    display: "grid",
-                    gridTemplateColumns: "repeat(5, 1fr)",
-                    gap: "6px",
-                    width: "100%",
-                } },
-                digits.map((d) => (React.createElement(DFL.DialogButton, { key: d, disabled: disabled, onClick: () => press(d), style: digitBtn }, d))),
-                React.createElement(DFL.DialogButton, { disabled: disabled || !value, onClick: backspace, style: digitBtn }, "\u232B"),
-                React.createElement(DFL.DialogButton, { disabled: disabled || !value, onClick: clear, style: digitBtn }, "CLR")))));
+    return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", flexDirection: "column", gap: "8px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { fontSize: "13px", opacity: 0.85 }, children: ["Numeric keypad (no keyboard needed):", " ", SP_JSX.jsx("span", { style: { fontWeight: 700 }, children: value || "—" })] }), SP_JSX.jsxs("div", { style: {
+                        display: "grid",
+                        gridTemplateColumns: "repeat(5, 1fr)",
+                        gap: "6px",
+                        width: "100%",
+                    }, children: [digits.map((d) => (SP_JSX.jsx(DFL.DialogButton, { disabled: disabled, onClick: () => press(d), style: digitBtn, children: d }, d))), SP_JSX.jsx(DFL.DialogButton, { disabled: disabled || !value, onClick: backspace, style: digitBtn, children: "\u232B" }), SP_JSX.jsx(DFL.DialogButton, { disabled: disabled || !value, onClick: clear, style: digitBtn, children: "CLR" })] })] }) }));
 };
-
-/**
- * Cart-process results modal.
- *
- * Shown immediately after the QAM panel's "Process cart" button
- * finishes its batch run on the backend. Lists each AppID with a
- * green tick (success — .hammer file produced, will appear after
- * Steam restart) or a red cross (failure — ValveOFF returned an error
- * message, the AppID stays in the cart so the user can retry).
- *
- * The modal also has an inline path to the next obvious step: if any
- * of the items succeeded, a "Restart Steam now" button hands off to
- * the existing 10-second restart countdown. If everything failed, we
- * just show a "Close" button — the user can read the per-line error
- * messages and decide what to do.
- *
- * We deliberately use `ModalRoot` with custom children rather than
- * `ConfirmModal`, because the per-row content needs more layout
- * flexibility than ConfirmModal's `strDescription` text affords.
- */
 
 const CartResultsBody = ({ result, closeModal, onRestart }) => {
     const { results, successful, failed, cart_remaining, pending_count } = result;
     const anySucceeded = successful.length > 0;
-    return (React.createElement(DFL.ModalRoot, { onCancel: () => closeModal?.(), onEscKeypress: () => closeModal?.(), bAllowFullSize: false, closeModal: closeModal },
-        React.createElement("div", { style: { padding: "4px 0 12px 0", maxHeight: "60vh", overflowY: "auto" } },
-            React.createElement("div", { style: {
-                    fontSize: "16px",
-                    fontWeight: 700,
-                    marginBottom: "10px",
-                } },
-                "Cart processed \u2014 ",
-                successful.length,
-                " succeeded",
-                failed.length > 0 ? `, ${failed.length} failed` : ""),
-            React.createElement("div", { style: {
-                    fontSize: "13px",
-                    opacity: 0.8,
-                    marginBottom: "14px",
-                    lineHeight: 1.4,
-                } }, anySucceeded
-                ? `${successful.length} .hammer file${successful.length === 1 ? " is" : "s are"} now on disk. ${pending_count > 0
-                    ? `Restart Steam to bring ${pending_count} game${pending_count === 1 ? "" : "s"} into the library.`
-                    : "Restart Steam to apply."}`
-                : "No .hammer files were produced. Failed items remain in cart so you can retry."),
-            results.length === 0 && (React.createElement("div", { style: { opacity: 0.6, fontSize: "13px" } }, "Cart was empty.")),
-            results.map((r) => (React.createElement("div", { key: r.appid, style: {
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "8px 10px",
-                    margin: "4px 0",
-                    borderRadius: "4px",
-                    background: r.ok
-                        ? "rgba(28, 134, 60, 0.18)"
-                        : "rgba(176, 32, 32, 0.18)",
-                    border: `1px solid ${r.ok
-                        ? "rgba(28, 134, 60, 0.35)"
-                        : "rgba(176, 32, 32, 0.35)"}`,
-                } },
-                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
-                    React.createElement("span", { style: {
-                            width: "20px",
-                            fontSize: "16px",
-                            fontWeight: 700,
-                            color: r.ok ? "#2adb5e" : "#ff6b6b",
-                            textAlign: "center",
-                        } }, r.ok ? "✓" : "✗"),
-                    React.createElement("div", null,
-                        React.createElement("div", { style: { fontWeight: 600 } }, r.title || `AppID ${r.appid}`),
-                        React.createElement("div", { style: {
-                                fontSize: "12px",
-                                opacity: 0.75,
-                                marginTop: "2px",
-                            } },
-                            "AppID ",
-                            r.appid,
-                            " \u00B7",
-                            " ",
-                            r.ok
-                                ? `stage=${r.stage} — .hammer ready`
-                                : r.error || `failed at ${r.stage}`)))))),
-            cart_remaining > 0 && (React.createElement("div", { style: {
-                    marginTop: "12px",
-                    padding: "8px 12px",
-                    background: "rgba(184, 109, 33, 0.15)",
-                    border: "1px solid rgba(184, 109, 33, 0.35)",
-                    borderRadius: "4px",
-                    fontSize: "12px",
-                    opacity: 0.9,
-                } },
-                cart_remaining,
-                " item",
-                cart_remaining === 1 ? "" : "s",
-                " still in cart. You can retry from the QAM panel after fixing the underlying issue (e.g. internet drop, AppID typo).")),
-            React.createElement("div", { style: {
-                    display: "flex",
-                    gap: "8px",
-                    marginTop: "16px",
-                    justifyContent: "flex-end",
-                } },
-                React.createElement("button", { onClick: () => closeModal?.(), style: {
-                        padding: "8px 16px",
-                        borderRadius: "4px",
-                        border: "1px solid rgba(255, 255, 255, 0.2)",
-                        background: "rgba(255, 255, 255, 0.06)",
-                        color: "#fff",
-                        cursor: "pointer",
-                        fontSize: "13px",
-                        fontWeight: 600,
-                    } }, "Close"),
-                anySucceeded && (React.createElement("button", { onClick: () => {
-                        closeModal?.();
-                        onRestart();
-                    }, style: {
-                        padding: "8px 16px",
-                        borderRadius: "4px",
-                        border: "1px solid rgba(28, 134, 60, 0.6)",
-                        background: "rgba(28, 134, 60, 0.85)",
-                        color: "#fff",
-                        cursor: "pointer",
-                        fontSize: "13px",
+    return (SP_JSX.jsx(DFL.ModalRoot, { onCancel: () => closeModal?.(), onEscKeypress: () => closeModal?.(), bAllowFullSize: false, closeModal: closeModal, children: SP_JSX.jsxs("div", { style: { padding: "4px 0 12px 0", maxHeight: "60vh", overflowY: "auto" }, children: [SP_JSX.jsxs("div", { style: {
+                        fontSize: "16px",
                         fontWeight: 700,
-                    } }, "Restart Steam (10s)"))))));
+                        marginBottom: "10px",
+                    }, children: ["Cart processed \u2014 ", successful.length, " succeeded", failed.length > 0 ? `, ${failed.length} failed` : ""] }), SP_JSX.jsx("div", { style: {
+                        fontSize: "13px",
+                        opacity: 0.8,
+                        marginBottom: "14px",
+                        lineHeight: 1.4,
+                    }, children: anySucceeded
+                        ? `${successful.length} .hammer file${successful.length === 1 ? " is" : "s are"} now on disk. ${pending_count > 0
+                            ? `Restart Steam to bring ${pending_count} game${pending_count === 1 ? "" : "s"} into the library.`
+                            : "Restart Steam to apply."}`
+                        : "No .hammer files were produced. Failed items remain in cart so you can retry." }), results.length === 0 && (SP_JSX.jsx("div", { style: { opacity: 0.6, fontSize: "13px" }, children: "Cart was empty." })), results.map((r) => (SP_JSX.jsx("div", { style: {
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "8px 10px",
+                        margin: "4px 0",
+                        borderRadius: "4px",
+                        background: r.ok
+                            ? "rgba(28, 134, 60, 0.18)"
+                            : "rgba(176, 32, 32, 0.18)",
+                        border: `1px solid ${r.ok
+                            ? "rgba(28, 134, 60, 0.35)"
+                            : "rgba(176, 32, 32, 0.35)"}`,
+                    }, children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "10px" }, children: [SP_JSX.jsx("span", { style: {
+                                    width: "20px",
+                                    fontSize: "16px",
+                                    fontWeight: 700,
+                                    color: r.ok ? "#2adb5e" : "#ff6b6b",
+                                    textAlign: "center",
+                                }, children: r.ok ? "✓" : "✗" }), SP_JSX.jsxs("div", { children: [SP_JSX.jsx("div", { style: { fontWeight: 600 }, children: r.title || `AppID ${r.appid}` }), SP_JSX.jsxs("div", { style: {
+                                            fontSize: "12px",
+                                            opacity: 0.75,
+                                            marginTop: "2px",
+                                        }, children: ["AppID ", r.appid, " \u00B7", " ", r.ok
+                                                ? `stage=${r.stage} — .hammer ready`
+                                                : r.error || `failed at ${r.stage}`] })] })] }) }, r.appid))), cart_remaining > 0 && (SP_JSX.jsxs("div", { style: {
+                        marginTop: "12px",
+                        padding: "8px 12px",
+                        background: "rgba(184, 109, 33, 0.15)",
+                        border: "1px solid rgba(184, 109, 33, 0.35)",
+                        borderRadius: "4px",
+                        fontSize: "12px",
+                        opacity: 0.9,
+                    }, children: [cart_remaining, " item", cart_remaining === 1 ? "" : "s", " still in cart. You can retry from the QAM panel after fixing the underlying issue (e.g. internet drop, AppID typo)."] })), SP_JSX.jsxs("div", { style: {
+                        display: "flex",
+                        gap: "8px",
+                        marginTop: "16px",
+                        justifyContent: "flex-end",
+                    }, children: [SP_JSX.jsx("button", { onClick: () => closeModal?.(), style: {
+                                padding: "8px 16px",
+                                borderRadius: "4px",
+                                border: "1px solid rgba(255, 255, 255, 0.2)",
+                                background: "rgba(255, 255, 255, 0.06)",
+                                color: "#fff",
+                                cursor: "pointer",
+                                fontSize: "13px",
+                                fontWeight: 600,
+                            }, children: "Close" }), anySucceeded && (SP_JSX.jsx("button", { onClick: () => {
+                                closeModal?.();
+                                onRestart();
+                            }, style: {
+                                padding: "8px 16px",
+                                borderRadius: "4px",
+                                border: "1px solid rgba(28, 134, 60, 0.6)",
+                                background: "rgba(28, 134, 60, 0.85)",
+                                color: "#fff",
+                                cursor: "pointer",
+                                fontSize: "13px",
+                                fontWeight: 700,
+                            }, children: "Restart Steam (10s)" }))] })] }) }));
 };
 /**
  * Open the modal. Resolves to "restarted" / "closed" so callers can
@@ -1455,7 +1304,7 @@ function showCartResultsModal(result, pendingCount) {
                 resolve(v);
             }
         };
-        const handle = DFL.showModal(React.createElement(CartResultsBody, { result: result, onRestart: () => {
+        const handle = DFL.showModal(SP_JSX.jsx(CartResultsBody, { result: result, onRestart: () => {
                 void startSteamRestartCountdown({
                     pendingCount: pendingCount || result.successful.length,
                     source: "cart_results_modal",
@@ -1469,37 +1318,6 @@ function showCartResultsModal(result, pendingCount) {
     });
 }
 
-/**
- * Hammer Library — Quick Access Menu panel (v0.9.0).
- *
- * Four sections:
- *
- *   1. Add a game (manual)   — paste-an-AppID/URL → cart_add. Same flow
- *                              as the in-page button: it just queues
- *                              the AppID; ValveOFF doesn't run yet.
- *
- *   2. Cart (N items)        — the queue populated by the in-page
- *                              "Add to Library" button and / or the
- *                              paste-input above. Each row has a
- *                              "remove" button. The big "Process
- *                              cart" button below it fans out to
- *                              ValveOFF for every cart item and
- *                              shows a success/fail summary modal.
- *
- *   3. Apply pending changes — entries that already have a .hammer
- *                              file on disk (i.e. successful cart
- *                              processing in this session). Clicking
- *                              "Restart Steam" opens the 10-second
- *                              countdown.
- *
- *   4. Installed             — every .hammer file currently in
- *                              ~/.config/hammersteam/, with a
- *                              per-row delete button.
- *
- * Together these mirror the user's original brief: "kada Add to
- * Library parang add to cart … 5 yung na-add … click to ADD then
- * sasabihin mga successful add at fail."
- */
 const HammerLibraryPanel = () => {
     const [health, setHealth] = SP_REACT.useState(null);
     const [installed, setInstalled] = SP_REACT.useState([]);
@@ -1715,7 +1533,7 @@ const HammerLibraryPanel = () => {
             toaster.toast({
                 title: "Hammer cart",
                 body: `${result.successful.length} of ${result.successful.length + result.failed.length} AppIDs added. Restart Steam to apply.`,
-                icon: React.createElement(FaHammer, null),
+                icon: SP_JSX.jsx(FaHammer, {}),
                 duration: 5000,
             });
             await showCartResultsModal(result, result.pending_count);
@@ -1756,288 +1574,122 @@ const HammerLibraryPanel = () => {
         }
     }, [refreshInstalled, refreshPending]);
     // ── render ─────────────────────────────────────────────────────────────
-    return (React.createElement(React.Fragment, null,
-        React.createElement(DFL.PanelSection, { title: "Add a game" },
-            health && !health.ok && (React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "Backend status", description: `ValveOFF unavailable: ${health.reason}${"error" in health && health.error ? ` (${health.error})` : ""}`, highlightOnFocus: true }))),
-            health && health.ok && (React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "Backend", description: health.cli_ready
-                        ? `Ready (v${health.version ?? "?"}) — ${health.valveoff_path}`
-                        : "ValveOFF found but --cli mode unavailable. Update ValveOFF." }))),
-            detection.appid != null && (React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.ButtonItem, { layout: "below", disabled: busy || health?.ok === false, onClick: () => void onAddThisGame() },
-                    React.createElement(DFL.Focusable, { style: {
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            color: "#fff",
-                            background: "rgba(196, 38, 38, 0.95)",
-                            padding: "4px 8px",
-                            borderRadius: "4px",
-                            fontWeight: 700,
-                        } },
-                        React.createElement(FaPlus, null),
-                        detectedTitle
-                            ? `ADD THIS GAME — ${detectedTitle}`
-                            : `ADD THIS GAME — AppID ${detection.appid}`)))),
-            detection.appid != null && (React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "Detected on current page", description: `AppID ${detection.appid}${detectedTitle ? ` · ${detectedTitle}` : " · (resolving title…)"}` }))),
-            React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: () => void onOpenInputModal() },
-                    React.createElement(DFL.Focusable, { style: {
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "flex-start",
-                            gap: "4px",
-                        } },
-                        React.createElement("span", { style: { fontWeight: 700 } }, input.trim()
-                            ? "Edit AppID / Store URL"
-                            : "Enter AppID or Store URL"),
-                        React.createElement("span", { style: { fontSize: "12px", opacity: 0.8 } }, input.trim()
-                            ? input
-                            : "Opens keyboard modal (Steam + X if keyboard missing)")))),
-            React.createElement(AppIdDigitPad, { value: input, onChange: setInput, disabled: busy }),
-            React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.ButtonItem, { layout: "below", disabled: busy || !input.trim() || health?.ok === false, onClick: () => void onAddToCart() }, busy ? (React.createElement(DFL.Focusable, { style: { display: "flex", alignItems: "center", gap: "8px" } },
-                    React.createElement(DFL.Spinner, { style: { width: 16, height: 16 } }),
-                    "Adding to cart\u2026")) : (React.createElement(DFL.Focusable, { style: { display: "flex", alignItems: "center", gap: "8px" } },
-                    React.createElement(FaPlus, null),
-                    "Add to cart")))),
-            statusLine && (React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "Status", description: statusLine })))),
-        React.createElement(DFL.PanelSection, { title: `Cart (${cart.count} item${cart.count === 1 ? "" : "s"})` },
-            React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: cart.count === 0
-                        ? "Cart is empty"
-                        : `${cart.count} AppID${cart.count === 1 ? "" : "s"} ready to process`, description: cart.count === 0
-                        ? "Tap the in-page Add to Library button on a Steam app page (or paste an AppID above)."
-                        : "Press Process cart to run ValveOFF on every item. Successful ones move to Pending; failed ones stay in cart." })),
-            cart.appids.slice(0, 16).map((id) => (React.createElement(DFL.PanelSectionRow, { key: `cart-${id}` },
-                React.createElement(DFL.Focusable, { style: {
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: "8px",
-                        width: "100%",
-                    } },
-                    React.createElement("div", { style: { flex: 1 } },
-                        React.createElement(DFL.Field, { label: titleFor(id, cart.titles), description: `AppID ${id} · queued` })),
-                    React.createElement(DFL.DialogButton, { onClick: () => void onRemoveFromCart(id), style: { minWidth: "32px", padding: "4px 8px" } },
-                        React.createElement(FaTrash, null)))))),
-            cart.appids.length > 16 && (React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "\u2026", description: `+${cart.appids.length - 16} more in cart` }))),
-            cart.count > 0 && (React.createElement(React.Fragment, null,
-                React.createElement(DFL.PanelSectionRow, null,
-                    React.createElement(DFL.ButtonItem, { layout: "below", disabled: busy || health?.ok === false, onClick: () => void onProcessCart() }, busy ? (React.createElement(DFL.Focusable, { style: {
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                        } },
-                        React.createElement(DFL.Spinner, { style: { width: 16, height: 16 } }),
-                        "Processing\u2026")) : (React.createElement(DFL.Focusable, { style: {
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                        } },
-                        React.createElement(FaHammer, null),
-                        "Process cart (",
-                        cart.count,
-                        ")")))),
-                React.createElement(DFL.PanelSectionRow, null,
-                    React.createElement(DFL.DialogButton, { onClick: () => void onClearCart(), style: { width: "100%" }, disabled: busy },
-                        React.createElement(DFL.Focusable, { style: {
+    return (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "Add a game", children: [health && !health.ok && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Backend status", description: `ValveOFF unavailable: ${health.reason}${"error" in health && health.error ? ` (${health.error})` : ""}`, highlightOnFocus: true }) })), health && health.ok && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Backend", description: health.cli_ready
+                                ? `Ready (v${health.version ?? "?"}) — ${health.valveoff_path}`
+                                : "ValveOFF found but --cli mode unavailable. Update ValveOFF." }) })), detection.appid != null && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: busy || health?.ok === false, onClick: () => void onAddThisGame(), children: SP_JSX.jsxs(DFL.Focusable, { style: {
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                    color: "#fff",
+                                    background: "rgba(196, 38, 38, 0.95)",
+                                    padding: "4px 8px",
+                                    borderRadius: "4px",
+                                    fontWeight: 700,
+                                }, children: [SP_JSX.jsx(FaPlus, {}), detectedTitle
+                                        ? `ADD THIS GAME — ${detectedTitle}`
+                                        : `ADD THIS GAME — AppID ${detection.appid}`] }) }) })), detection.appid != null && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Detected on current page", description: `AppID ${detection.appid}${detectedTitle ? ` · ${detectedTitle}` : " · (resolving title…)"}` }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: () => void onOpenInputModal(), children: SP_JSX.jsxs(DFL.Focusable, { style: {
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "flex-start",
+                                    gap: "4px",
+                                }, children: [SP_JSX.jsx("span", { style: { fontWeight: 700 }, children: input.trim()
+                                            ? "Edit AppID / Store URL"
+                                            : "Enter AppID or Store URL" }), SP_JSX.jsx("span", { style: { fontSize: "12px", opacity: 0.8 }, children: input.trim()
+                                            ? input
+                                            : "Opens keyboard modal (Steam + X if keyboard missing)" })] }) }) }), SP_JSX.jsx(AppIdDigitPad, { value: input, onChange: setInput, disabled: busy }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: busy || !input.trim() || health?.ok === false, onClick: () => void onAddToCart(), children: busy ? (SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsx(DFL.Spinner, { style: { width: 16, height: 16 } }), "Adding to cart\u2026"] })) : (SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsx(FaPlus, {}), "Add to cart"] })) }) }), statusLine && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Status", description: statusLine }) }))] }), SP_JSX.jsxs(DFL.PanelSection, { title: `Cart (${cart.count} item${cart.count === 1 ? "" : "s"})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: cart.count === 0
+                                ? "Cart is empty"
+                                : `${cart.count} AppID${cart.count === 1 ? "" : "s"} ready to process`, description: cart.count === 0
+                                ? "Tap the in-page Add to Library button on a Steam app page (or paste an AppID above)."
+                                : "Press Process cart to run ValveOFF on every item. Successful ones move to Pending; failed ones stay in cart." }) }), cart.appids.slice(0, 16).map((id) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: {
                                 display: "flex",
                                 alignItems: "center",
+                                justifyContent: "space-between",
                                 gap: "8px",
-                            } },
-                            React.createElement(FaTrash, null),
-                            "Clear cart")))))),
-        React.createElement(DFL.PanelSection, { title: "Apply pending changes" },
-            React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: pending.count === 0
-                        ? "No pending games"
-                        : `${pending.count} game${pending.count === 1 ? "" : "s"} waiting for restart`, description: pending.count === 0
-                        ? "Process cart first; successful items will land here."
-                        : "Hammer's hook only refires when Steam starts. Restart now to bring the new game(s) into the library." })),
-            pending.entries.slice(0, 6).map((e) => (React.createElement(DFL.PanelSectionRow, { key: `pending-${e.appid}` },
-                React.createElement(DFL.Field, { label: e.title || `AppID ${e.appid}`, description: `AppID ${e.appid} · added ${timeAgo(e.added_at)}` })))),
-            pending.entries.length > 6 && (React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "\u2026", description: `+${pending.entries.length - 6} more queued` }))),
-            React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.ButtonItem, { layout: "below", disabled: busy || health?.ok === false, onClick: () => void onRestart() },
-                    React.createElement(DFL.Focusable, { style: { display: "flex", alignItems: "center", gap: "8px" } },
-                        React.createElement(FaSyncAlt, null),
-                        "Restart Steam (10s countdown)")))),
-        React.createElement(DFL.PanelSection, { title: `Installed (${installed.length})` },
-            React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.DialogButton, { onClick: () => void refreshInstalled(), style: { width: "100%" } },
-                    React.createElement(DFL.Focusable, { style: { display: "flex", alignItems: "center", gap: "8px" } },
-                        React.createElement(FaSyncAlt, null),
-                        "Rescan disk"))),
-            installed.length === 0 && (React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "No .hammer files", description: "Add a game above, or copy .hammer files into ~/.config/hammersteam/." }))),
-            installed.slice(0, 12).map((g) => {
-                const title = installedTitles[String(g.appid)];
-                return (React.createElement(DFL.PanelSectionRow, { key: g.filename },
-                    React.createElement(DFL.Focusable, { style: {
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: "8px",
-                            width: "100%",
-                        } },
-                        React.createElement("div", { style: { flex: 1 } },
-                            React.createElement(DFL.Field, { label: title || `AppID ${g.appid || "?"}`, description: `${g.appid
-                                    ? `AppID ${g.appid} · `
-                                    : ""}${g.filename} • ${formatBytes(g.size_bytes)} • ${timeAgo(g.mtime)}` })),
-                        React.createElement(DFL.DialogButton, { onClick: () => void onRemoveInstalled(g.appid), style: { minWidth: "32px", padding: "4px 8px" } },
-                            React.createElement(FaTrash, null)))));
-            }),
-            installed.length > 12 && (React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "\u2026", description: `+${installed.length - 12} more` })))),
-        React.createElement(DFL.PanelSection, { title: "Diagnostics" },
-            React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "Plugin version (frontend)", description: `v${detection.pluginVersion}` })),
-            React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "Backend version", description: health?.ok
-                        ? `v${health.version ?? "?"}`
-                        : "(backend not ready)" })),
-            React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "Detected AppID", description: detection.appid != null
-                        ? `${detection.appid} — button ${detection.lastTitle ? "anchored" : "floating fallback"}`
-                        : "(none — open a Steam app page)" })),
-            React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "Detection sources", description: `SteamClient.URL=${detection.sources.url ?? "—"} • route=${detection.sources.route ?? "—"} • DOM=${detection.sources.dom ?? "—"}` })),
-            React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "Last route", description: detection.lastUrl || "(empty)" })),
-            detection.lastTitle && (React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "Anchored to title", description: detection.lastTitle }))),
-            detection.appid != null && (React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: () => {
-                        setInput(String(detection.appid));
-                        setStatusLine(`Pasted AppID ${detection.appid} from current page.`);
-                    } },
-                    React.createElement(DFL.Focusable, { style: {
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                        } },
-                        React.createElement(FaPlus, null),
-                        "Copy detected AppID into input")))),
-            React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: () => {
-                        void (async () => {
-                            const probe_id = coerceAppid(input.trim()) ??
-                                detection.appid ??
-                                413150; // Stardew Valley as a known-good
-                            setProbeStatus(`probing ${probe_id}…`);
-                            try {
-                                const res = await probeTitle(probe_id);
-                                if (res.ok) {
-                                    setProbeStatus(`OK · ${probe_id} → "${res.name}" (${res.status}, ${res.elapsed ?? "?"}s)`);
-                                }
-                                else {
-                                    setProbeStatus(`FAIL · ${probe_id} status=${res.status ?? "?"}${res.elapsed != null
-                                        ? ` (${res.elapsed}s)`
-                                        : ""}`);
-                                }
-                            }
-                            catch (ex) {
-                                setProbeStatus(`RPC error: ${ex}`);
-                            }
-                        })();
-                    } },
-                    React.createElement(DFL.Focusable, { style: {
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                        } },
-                        React.createElement(FaSyncAlt, null),
-                        "Force probe title (AppID = input/detected/413150)"))),
-            probeStatus && (React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.Field, { label: "Last probe", description: probeStatus }))),
-            React.createElement(DFL.PanelSectionRow, null,
-                React.createElement(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: () => {
-                        void (async () => {
-                            try {
-                                const snap = await diagnosticsSnapshot();
-                                setSnapshot(snap);
-                            }
-                            catch (ex) {
-                                setStatusLine(`diagnostics_snapshot RPC failed: ${ex}`);
-                            }
-                        })();
-                    } },
-                    React.createElement(DFL.Focusable, { style: {
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                        } },
-                        React.createElement(FaSyncAlt, null),
-                        "Refresh backend snapshot"))),
-            snapshot && (React.createElement(React.Fragment, null,
-                React.createElement(DFL.PanelSectionRow, null,
-                    React.createElement(DFL.Field, { label: "Title-cache size", description: `${snapshot.title_cache_size} resolved title(s) in session cache` })),
-                React.createElement(DFL.PanelSectionRow, null,
-                    React.createElement(DFL.Field, { label: "Cache sample", description: Object.keys(snapshot.title_cache_sample).length === 0
-                            ? "(empty — title resolver hasn't successfully fetched anything yet)"
-                            : Object.entries(snapshot.title_cache_sample)
-                                .map(([id, name]) => `${id} → ${name}`)
-                                .join(" · ") })))))));
+                                width: "100%",
+                            }, children: [SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.Field, { label: titleFor(id, cart.titles), description: `AppID ${id} · queued` }) }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onRemoveFromCart(id), style: { minWidth: "32px", padding: "4px 8px" }, children: SP_JSX.jsx(FaTrash, {}) })] }) }, `cart-${id}`))), cart.appids.length > 16 && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "\u2026", description: `+${cart.appids.length - 16} more in cart` }) })), cart.count > 0 && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: busy || health?.ok === false, onClick: () => void onProcessCart(), children: busy ? (SP_JSX.jsxs(DFL.Focusable, { style: {
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "8px",
+                                        }, children: [SP_JSX.jsx(DFL.Spinner, { style: { width: 16, height: 16 } }), "Processing\u2026"] })) : (SP_JSX.jsxs(DFL.Focusable, { style: {
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "8px",
+                                        }, children: [SP_JSX.jsx(FaHammer, {}), "Process cart (", cart.count, ")"] })) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onClearCart(), style: { width: "100%" }, disabled: busy, children: SP_JSX.jsxs(DFL.Focusable, { style: {
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "8px",
+                                        }, children: [SP_JSX.jsx(FaTrash, {}), "Clear cart"] }) }) })] }))] }), SP_JSX.jsxs(DFL.PanelSection, { title: "Apply pending changes", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: pending.count === 0
+                                ? "No pending games"
+                                : `${pending.count} game${pending.count === 1 ? "" : "s"} waiting for restart`, description: pending.count === 0
+                                ? "Process cart first; successful items will land here."
+                                : "Hammer's hook only refires when Steam starts. Restart now to bring the new game(s) into the library." }) }), pending.entries.slice(0, 6).map((e) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: e.title || `AppID ${e.appid}`, description: `AppID ${e.appid} · added ${timeAgo(e.added_at)}` }) }, `pending-${e.appid}`))), pending.entries.length > 6 && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "\u2026", description: `+${pending.entries.length - 6} more queued` }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: busy || health?.ok === false, onClick: () => void onRestart(), children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsx(FaSyncAlt, {}), "Restart Steam (10s countdown)"] }) }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: `Installed (${installed.length})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.DialogButton, { onClick: () => void refreshInstalled(), style: { width: "100%" }, children: SP_JSX.jsxs(DFL.Focusable, { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsx(FaSyncAlt, {}), "Rescan disk"] }) }) }), installed.length === 0 && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "No .hammer files", description: "Add a game above, or copy .hammer files into ~/.config/hammersteam/." }) })), installed.slice(0, 12).map((g) => {
+                        const title = installedTitles[String(g.appid)];
+                        return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { style: {
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: "8px",
+                                    width: "100%",
+                                }, children: [SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.Field, { label: title || `AppID ${g.appid || "?"}`, description: `${g.appid
+                                                ? `AppID ${g.appid} · `
+                                                : ""}${g.filename} • ${formatBytes(g.size_bytes)} • ${timeAgo(g.mtime)}` }) }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => void onRemoveInstalled(g.appid), style: { minWidth: "32px", padding: "4px 8px" }, children: SP_JSX.jsx(FaTrash, {}) })] }) }, g.filename));
+                    }), installed.length > 12 && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "\u2026", description: `+${installed.length - 12} more` }) }))] }), SP_JSX.jsxs(DFL.PanelSection, { title: "Diagnostics", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Plugin version (frontend)", description: `v${detection.pluginVersion}` }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Backend version", description: health?.ok
+                                ? `v${health.version ?? "?"}`
+                                : "(backend not ready)" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Detected AppID", description: detection.appid != null
+                                ? `${detection.appid} — button ${detection.lastTitle ? "anchored" : "floating fallback"}`
+                                : "(none — open a Steam app page)" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Detection sources", description: `SteamClient.URL=${detection.sources.url ?? "—"} • route=${detection.sources.route ?? "—"} • DOM=${detection.sources.dom ?? "—"}` }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Last route", description: detection.lastUrl || "(empty)" }) }), detection.lastTitle && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Anchored to title", description: detection.lastTitle }) })), detection.appid != null && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: () => {
+                                setInput(String(detection.appid));
+                                setStatusLine(`Pasted AppID ${detection.appid} from current page.`);
+                            }, children: SP_JSX.jsxs(DFL.Focusable, { style: {
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                }, children: [SP_JSX.jsx(FaPlus, {}), "Copy detected AppID into input"] }) }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: () => {
+                                void (async () => {
+                                    const probe_id = coerceAppid(input.trim()) ??
+                                        detection.appid ??
+                                        413150; // Stardew Valley as a known-good
+                                    setProbeStatus(`probing ${probe_id}…`);
+                                    try {
+                                        const res = await probeTitle(probe_id);
+                                        if (res.ok) {
+                                            setProbeStatus(`OK · ${probe_id} → "${res.name}" (${res.status}, ${res.elapsed ?? "?"}s)`);
+                                        }
+                                        else {
+                                            setProbeStatus(`FAIL · ${probe_id} status=${res.status ?? "?"}${res.elapsed != null
+                                                ? ` (${res.elapsed}s)`
+                                                : ""}`);
+                                        }
+                                    }
+                                    catch (ex) {
+                                        setProbeStatus(`RPC error: ${ex}`);
+                                    }
+                                })();
+                            }, children: SP_JSX.jsxs(DFL.Focusable, { style: {
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                }, children: [SP_JSX.jsx(FaSyncAlt, {}), "Force probe title (AppID = input/detected/413150)"] }) }) }), probeStatus && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Last probe", description: probeStatus }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: () => {
+                                void (async () => {
+                                    try {
+                                        const snap = await diagnosticsSnapshot();
+                                        setSnapshot(snap);
+                                    }
+                                    catch (ex) {
+                                        setStatusLine(`diagnostics_snapshot RPC failed: ${ex}`);
+                                    }
+                                })();
+                            }, children: SP_JSX.jsxs(DFL.Focusable, { style: {
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                }, children: [SP_JSX.jsx(FaSyncAlt, {}), "Refresh backend snapshot"] }) }) }), snapshot && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Title-cache size", description: `${snapshot.title_cache_size} resolved title(s) in session cache` }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { label: "Cache sample", description: Object.keys(snapshot.title_cache_sample).length === 0
+                                        ? "(empty — title resolver hasn't successfully fetched anything yet)"
+                                        : Object.entries(snapshot.title_cache_sample)
+                                            .map(([id, name]) => `${id} → ${name}`)
+                                            .join(" · ") }) })] }))] })] }));
 };
 
-/**
- * Hammer Library — Decky Loader plugin (v0.9.0).
- *
- * What this plugin gives the user:
- *
- *   1. A "Hammer Library" section in the Quick Access Menu (QAM) with
- *      a paste-AppID/URL field, a cart view, a "Process cart" button,
- *      and a 10-second restart countdown.
- *
- *   2. A floating "Add to Library" button injected directly into the
- *      title row of every Steam app detail page (Big Picture / Game
- *      Mode / Desktop overlay). Each tap is an "add to cart" — the
- *      AppID gets remembered locally and the user can keep browsing.
- *      A second tap on the same page toggles the AppID back out of
- *      the cart, like Steam's own "Add to Cart" / "Remove" toggle.
- *
- *   3. A 10-second countdown modal for restarting Steam, exposed both
- *      from the QAM panel ("Apply pending") and as the "Restart Steam"
- *      button on the cart-results modal that appears after Process cart.
- *      The modal is cancellable, so users can keep adding before
- *      applying.
- *
- * Architecture:
- *
- *   • The in-page button is mounted from `installInjector()` (called
- *     once, here in `definePlugin`) into a hidden React root in
- *     `document.body`. That root polls window.location for app-page
- *     URLs and uses a MutationObserver to find the title element
- *     and createPortal the button next to it. The whole pipeline
- *     lives in `src/buttonInjector.tsx` — read that file's header
- *     comment for the why-this-architecture story.
- *
- *   • The Python backend (`main.py`) keeps two session-local queues:
- *     `_cart` (raw AppIDs awaiting ValveOFF) and `_pending` (AppIDs
- *     whose .hammer file is on disk awaiting a Steam restart). The
- *     QAM panel renders both, the in-page button only writes to
- *     `_cart`, and the restart countdown drains `_pending` on its
- *     way out.
- *
- *   • Why a Steam restart at all? Hammer's GetSubscribedApps hook
- *     only fires at Steam startup; the live-refresh callback path
- *     crashes Steam's CCompatManager in spoofed-Steam mode. See
- *     RECIPE.md "Why Hammer no longer fires AppLicensesChanged_t"
- *     for the full crash story; the short version is "we tried, it
- *     SIGSEGVs in V_stristr". A 10-second restart is honest UX; the
- *     plugin makes it fast and obvious instead of a hidden manual
- *     step.
- *
- * On mount we also run a one-shot rescue (`cleanupPoisoned`) that
- * wipes fake AppOverview entries left behind by v0.4-0.7 of this
- * plugin. Safe no-op on clean installs.
- */
 // ── Mount-time rescue ──────────────────────────────────────────────────────
 const PanelWithCleanup = () => {
     SP_REACT.useEffect(() => {
@@ -2053,20 +1705,20 @@ const PanelWithCleanup = () => {
             }
         })();
     }, []);
-    return React.createElement(HammerLibraryPanel, null);
+    return SP_JSX.jsx(HammerLibraryPanel, {});
 };
 // ── Plugin definition ─────────────────────────────────────────────────────
 var index = definePlugin(() => {
-    console.log("[hammer-decky] plugin loaded (v0.9.12 — modal AppID input + digit pad for post-SteamOS-update keyboard fix)");
+    console.log("[hammer-decky] plugin loaded (v0.9.13 — fix React/SP_REACT build for Decky 3.x QAM)");
     // Mount the in-page Add-to-Library button injector. Returns the
     // tear-down function used by `onDismount` so reinstalls / hot
     // reloads don't leave stray DOM hosts behind.
     const removeInjector = installInjector();
     return {
         name: "Hammer Library",
-        titleView: React.createElement("div", { className: DFL.staticClasses.Title }, "Hammer Library"),
-        content: React.createElement(PanelWithCleanup, null),
-        icon: React.createElement(FaHammer, null),
+        titleView: SP_JSX.jsx("div", { className: DFL.staticClasses.Title, children: "Hammer Library" }),
+        content: SP_JSX.jsx(PanelWithCleanup, {}),
+        icon: SP_JSX.jsx(FaHammer, {}),
         onDismount: () => {
             console.log("[hammer-decky] plugin unmounted");
             try {

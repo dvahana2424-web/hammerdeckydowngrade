@@ -1,7 +1,7 @@
 build_date=2026-07-01
 hammer_version=1.1.6
-hammer_decky_version=0.9.12
+hammer_decky_version=0.9.13
 hammersteam_bytes=16829304
 library_inject_bytes=26540
 steam_client_build=1782257239
-notes=hammer-decky v0.9.12 modal AppID input + digit pad; gamemode rootfs probe fix; Decky install detection fix; config patterns for build 1782257239
+notes=hammer-decky v0.9.13 fix React is not defined (jsx react-jsx → SP_JSX/SP_REACT for Decky 3.x QAM)
