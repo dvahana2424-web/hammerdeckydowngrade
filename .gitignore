@@ -1,0 +1,8 @@
+# The compiled bundle is hosted on the `bundle-linux` branch as split parts,
+# never committed to main (too large + keeps distribution/source separation).
+valveoff-bundle.tar.gz
+valveoff-bundle.tar.gz.*
+
+# Python cache
+__pycache__/
+*.pyc
