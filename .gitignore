@@ -1,7 +1,6 @@
-# The compiled bundle is hosted on the `bundle-linux` branch as split parts,
-# never committed to main (too large + keeps distribution/source separation).
+# Full tarball / checksum stay out of main; split parts are tracked for raw download.
 valveoff-bundle.tar.gz
-valveoff-bundle.tar.gz.*
+valveoff-bundle.tar.gz.sha256
 
 # Python cache
 __pycache__/
