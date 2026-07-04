@@ -21,7 +21,10 @@ You will be asked for your **sudo password once**. Everything else is automatic.
    - deletes `steam.cfg` so **Steam auto-update is re-enabled**,
    - removes `~/.local/share/SLSsteam` and `~/.config/SLSsteam`.
 3. Downloads the ValveOFF bundle into your **Downloads** folder
-   (`~/Downloads/ValveOFF 1.4/`).
+   (`~/Downloads/ValveOFF 1.4/`). The bundle includes ValveOFF, hammer-decky,
+   and Hammer binaries; the installer then **refreshes `hammersteam.so` from
+   `main/bin`** (currently Hammer **1.1.8** `https-exit-fix`) so you always
+   get the latest exit/crash fixes even if an older bundle tarball is cached.
 4. Installs **Decky Loader (latest)** if it isn't already present.
 5. Installs **Hammer + ValveOFF + hammer-decky** and wires the Desktop-Mode unlock.
 6. Applies the **Game-Mode unlock** (`steam-jupiter` patch on SteamOS,

@@ -55,11 +55,12 @@ cd "$HOME/Downloads/ValveOFF 1.4"
 
 ## Self-hosting the bundle
 
-The big bundle ships as split raw files on the
-[`bundle-linux`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/bundle-linux)
-branch (`valveoff-bundle.tar.gz.00.part`, `…01.part`) — **no GitHub Release**,
+The big bundle ships as split raw files on
+[`main`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/main)
+(`valveoff-bundle.tar.gz.00.part`, `…01.part`, `…sha256`) — **no GitHub Release**,
 so GitHub never exposes an auto-generated "Source code" download. The installer
-concatenates the parts and verifies the SHA256.
+concatenates the parts, verifies the SHA256, then refreshes `hammersteam.so` from
+`main/bin/` (always the latest Hammer build).
 
 Point the installer at your own single-file mirror with:
 
@@ -76,10 +77,12 @@ VALVEOFF_BUNDLE_URL=https://example.com/valveoff-bundle.tar.gz \
 downgrade cache. No application source code lives on `main` (same model as the
 [`valveoff`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/valveoff)
 and [`installer`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/installer)
-branches). Full ValveOFF + hammer-decky ship as split raw files on the
+branches). Full ValveOFF + hammer-decky ship as split raw files on
+[`main`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/main)
+(`valveoff-bundle.tar.gz.00.part` + `…01.part`) — **no GitHub Release**,
+so no auto-generated "Source code" archive is ever exposed. Legacy
 [`bundle-linux`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/bundle-linux)
-branch (`valveoff-bundle.tar.gz.00.part` + `…01.part`) — **no GitHub Release**,
-so no auto-generated "Source code" archive is ever exposed.
+may lag behind; one-paste installs use `main`.
 
 Hosted Hammer binaries and config for Steam Deck — one-command update.
 

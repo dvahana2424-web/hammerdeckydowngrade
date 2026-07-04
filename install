@@ -25,13 +25,16 @@
 set -uo pipefail
 
 # ── Config ──────────────────────────────────────────────────────────────────
-# The payload is hosted as split (<100 MB) raw files on the `bundle-linux`
-# branch — NO GitHub Release, NO auto-generated "Source code" download, and
-# NO application source anywhere in this repo or its history.
+# The payload is hosted as split (<100 MB) raw files on the `main` branch
+# (legacy `bundle-linux` branch may lag — do not point one-paste installs there).
 REPO="dvahana2424-web/hammerdeckydowngrade"
-BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-bundle-linux}"
+# Default to `main` — it ships the current ValveOFF bundle parts + matches
+# `bin/hammersteam.so`. The legacy `bundle-linux` branch lagged behind (1.1.6)
+# and caused one-paste installs to deploy stale Hammer binaries.
+BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-main}"
 BUNDLE_FILE="valveoff-bundle.tar.gz"
 BUNDLE_RAW_BASE="${VALVEOFF_BUNDLE_RAW_BASE:-https://raw.githubusercontent.com/$REPO/$BUNDLE_BRANCH}"
+MAIN_RAW_BASE="https://raw.githubusercontent.com/$REPO/main"
 # Space-separated list of part suffixes, concatenated in order.
 BUNDLE_PARTS="${VALVEOFF_BUNDLE_PARTS:-00 01}"
 # Optional single-file override (self-hosting): if set, skip the split parts.
@@ -285,7 +288,7 @@ download_bundle() {
 			die "Download failed. Check your internet / the bundle URL and try again."
 		fi
 	else
-		# Default: reassemble split raw parts from the bundle-linux branch.
+		# Default: reassemble split raw parts from the configured branch (main).
 		info "Source: $BUNDLE_RAW_BASE (parts: $BUNDLE_PARTS)"
 		: > "$tmp" || die "Cannot write to $tmp"
 		local part url
@@ -368,6 +371,51 @@ install_core() {
 		|| warn "Core install reported a non-zero exit — see messages above."
 }
 
+# Always pull hammersteam.so + library-inject.so from main/bin after the bundle
+# install. The tarball can lag behind `bin/` (observed: bundle-linux shipped 1.1.6
+# while main/bin had 1.1.8 https-exit-fix). Keeps existing config.yaml.
+refresh_hammer_binaries() {
+	title "Refresh Hammer binaries (main/bin — latest hammersteam.so)"
+	local hammer_dir="$HOME_DIR/.local/share/Hammer"
+	local tmp
+	tmp="$(mktemp -d "${TMPDIR:-/tmp}/valveoff-hammer.XXXXXX")"
+
+	mkdir -p "$hammer_dir"
+	info "Downloading hammersteam.so + library-inject.so from $MAIN_RAW_BASE/bin/ …"
+
+	if ! curl -fsSL --retry 3 --retry-delay 2 \
+		-o "$tmp/hammersteam.so" "$MAIN_RAW_BASE/bin/hammersteam.so"; then
+		rm -rf "$tmp"
+		warn "Could not download hammersteam.so — bundle copy left in place."
+		warn "  Run later: curl -fsSL $MAIN_RAW_BASE/update-hammer.sh | bash"
+		return 1
+	fi
+	if ! curl -fsSL --retry 3 --retry-delay 2 \
+		-o "$tmp/library-inject.so" "$MAIN_RAW_BASE/bin/library-inject.so"; then
+		rm -rf "$tmp"
+		warn "Could not download library-inject.so — bundle copy left in place."
+		return 1
+	fi
+
+	[[ "$(wc -c < "$tmp/hammersteam.so")" -gt 1000000 ]] \
+		|| { rm -rf "$tmp"; warn "hammersteam.so too small — skipping refresh."; return 1; }
+
+	cp -f "$tmp/hammersteam.so"   "$hammer_dir/hammersteam.so"
+	cp -f "$tmp/library-inject.so" "$hammer_dir/library-inject.so"
+	chmod 0755 "$hammer_dir/hammersteam.so" "$hammer_dir/library-inject.so"
+	rm -rf "$tmp"
+
+	# Best-effort version stamp for the install log.
+	if strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "https-exit-fix"; then
+		ok "Installed Hammer 1.1.8 (https-exit-fix) → $hammer_dir/"
+	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.8"; then
+		ok "Installed Hammer 1.1.8 → $hammer_dir/"
+	else
+		ok "Installed latest hammersteam.so → $hammer_dir/"
+		warn "  Version stamp not recognized — check ~/.Hammer.log after restarting Steam."
+	fi
+}
+
 # Install hammer-decky from the extracted ValveOFF bundle (compiled dist only —
 # no source on this public repo). Re-run full install or update-hammer-decky.sh
 # to refresh the plugin from the release tarball.
@@ -437,9 +485,11 @@ main() {
 	prime_sudo
 
 	smart_cleanup
+	stop_steam
 	download_bundle
 	install_decky
 	install_core
+	refresh_hammer_binaries || true
 	install_hammer_decky_from_bundle
 	apply_gamemode_unlock
 	relock_rootfs

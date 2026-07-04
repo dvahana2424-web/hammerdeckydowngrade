@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # update-hammer-decky.sh — install hammer-decky from the split ValveOFF bundle.
 # This public repo does NOT host plugin source and has NO GitHub Release — the
-# compiled bundle lives as split raw files on the `bundle-linux` branch.
+# compiled bundle lives as split raw files on `main` (legacy `bundle-linux` may lag).
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer-decky.sh | bash
@@ -9,7 +9,7 @@
 set -euo pipefail
 
 REPO="dvahana2424-web/hammerdeckydowngrade"
-BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-bundle-linux}"
+BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-main}"
 BUNDLE_FILE="valveoff-bundle.tar.gz"
 BUNDLE_RAW_BASE="${VALVEOFF_BUNDLE_RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${BUNDLE_BRANCH}}"
 BUNDLE_PARTS="${VALVEOFF_BUNDLE_PARTS:-00 01}"
