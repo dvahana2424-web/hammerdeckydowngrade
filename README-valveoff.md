@@ -7,8 +7,10 @@ Works on **SteamOS (Steam Deck)**, **Bazzite**, and most other Linux distros.
 Open **Konsole** in Desktop Mode (as your normal user, *not* root) and paste:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install | bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/bootstrap | bash
 ```
+
+(`bootstrap` always fetches a fresh `install` script — avoids GitHub raw CDN serving a stale copy after updates.)
 
 You will be asked for your **sudo password once**. Everything else is automatic.
 

@@ -4,6 +4,12 @@
 #
 #  Usage (Desktop Mode → Konsole, do NOT run as root):
 #
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/bootstrap | bash
+#
+#  Prefer `bootstrap` over `install` directly — GitHub raw CDN can serve a stale
+#  `install` copy for several minutes after an update (checksum / logic fixes).
+#
+#  Legacy (may hit CDN cache on Steam Deck):
 #    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install | bash
 #
 #  What this does, fully automatic, ONE sudo password prompt:
@@ -23,6 +29,13 @@
 #    VALVEOFF_BUNDLE_URL=https://example/valveoff-bundle.tar.gz curl ... | bash
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
+
+# Re-fetch this script when launched via a stale CDN copy (e.g. old checksum logic).
+# valveoff-install-rev=6
+if [ "${VALVEOFF_INSTALL_REV:-}" != "6" ]; then
+	export VALVEOFF_INSTALL_REV=6
+	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install?rev=6&ts=$(date +%s)")
+fi
 
 # ── Config ──────────────────────────────────────────────────────────────────
 # The payload is hosted as split (<100 MB) raw files on the `main` branch
