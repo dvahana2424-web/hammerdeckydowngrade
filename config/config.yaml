@@ -5,7 +5,6 @@ DepotResponsePatchBypassAuthFailures: yes
 InstallAppForceSuccess: yes
 DepotResponsePatchDepots: []
 DepotDecryptionPattern: ""
-Hammerlog : 2
 
 UseWhitelist: no
 AutoFilterList: yes
@@ -37,26 +36,26 @@ API: no
 FakeEmail: ""
 FakeWalletBalance: 0
 
+Hammerlog: 2
 ExtendedLogging: yes
 
 ManifestHookEnabled: yes
-ManifestPattern: "E8 ? ? ? ? 05 ? ? ? ? 55 89 E5 57 56 53 81 EC 10 01 00"
-GetManifestRequestCodeOffset: 0
+ManifestPattern: "e8 ? ? ? ? 05 ? ? ? ? 55 89 e5 57 56 53 81 ec 10 01 00"
+GetManifestRequestCodeOffset: 0x1341890
+ManifestProvider: Ost
+ManifestFallbackProvider: yes
 ManifestLocalCacheFallback: yes
-ManifestServerUrl: "https://manifest.activateme.workers.dev"
 ManifestDepotAllowFromKeys: yes
 ManifestDepots: []
-
-ManifestHttpWorkerThreads: 4
 
 OwnershipTicketDiskFallback: no
 
 UserOwnsDepotHookEnabled: yes
-UserOwnsDepotOffset: 0x181c610
-UserOwnsDepotPattern: ""
+UserOwnsDepotOffset: 0x185f1b0
+UserOwnsDepotPattern: "55 e8 ? ? ? ? 81 c5 ? ? ? ? 57 56 53 83 ec 74 ff b4 24"
 
 SteamlessAutoPatchEnabled: yes
-SteamlessCliPath: ""
+SteamlessCliPath: "~/.config/hammersteam/SteamlessCLI"
 SteamlessCliTimeoutSeconds: 120
 SteamlessRecursiveScan: yes
 SteamlessQuiet: yes
@@ -74,8 +73,20 @@ RecvPktOffset: 0
 
 AllowMissingPatterns: yes
 PatternOverrides:
-  "IClientUGC::RunIPCFrame": "e8 ?? ?? ?? ?? 8b 85 ?? ?? ?? ?? 83 c4 10 3d 67 0c d2 71"
-  "IClientUserStats::RunIPCFrame": "e8 ?? ?? ?? ?? 8b 85 ?? ?? ?? ?? 83 c4 10 3d 89 65 6d 87"
-  "CAPIJob::GetPlayerStats": "e8 ?? ?? ?? ?? 83 c4 10 89 c5 e9 ?? ?? ?? ?? ?? ?? 80 be ?? ?? ?? ?? 00"
-  "BBuildAndAsyncSendFrame": "55 89 e5 57 e8 ?? ?? ?? ?? 81 c7 ?? ?? ?? ?? 56 53 81 ec ac 00 00 00 8b"
-  "RecvPkt": "55 89 e5 57 56 e8 ?? ?? ?? ?? 81 c6 ?? ?? ?? ?? 53 83 ec 1c 8b 86 ?? ??"
+  "IClientApps::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 37 9c 88 a6"
+  "IClientRemoteStorage::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 6c e8 2f 87"
+  "IClientUGC::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 62 0c d2 71"
+  "IClientUserStats::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 8f 65 6d 87"
+  "CAPIJob::GetPlayerStats": "e8 ? ? ? ? 83 c4 10 89 c5 e9 ? ? ? ? ? ? 80 be ? ? ? ? 00"
+  "BBuildAndAsyncSendFrame": "55 89 e5 57 e8 ? ? ? ? 81 c7 ? ? ? ? 56 53 81 ec ac 00 00 00 8b"
+  "RecvPkt": "55 89 e5 57 56 e8 ? ? ? ? 81 c6 ? ? ? ? 53 83 ec 1c 8b 86 ? ?"
+
+CloudSaveEnabled: yes
+CloudSaveProvider: gdrive
+CloudSaveTokenPath: ~/.config/hammersteam/cloud_save_token.json
+CloudSaveAllAdditionalApps: yes
+CloudSaveAppIds: [553420, 413150]
+CloudSaveSyncAchievements: no
+CloudSaveSyncPlaytime: no
+CloudSaveStorageSubdir: hammer_cloud_save
+CloudSaveGDriveRoot: HammerCloudSave

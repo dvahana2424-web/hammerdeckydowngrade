@@ -51,7 +51,7 @@ MAIN_RAW_BASE="https://raw.githubusercontent.com/$REPO/main"
 # Authoritative checksum for the concatenated bundle parts on `main`.
 # Do not rely on fetching valveoff-bundle.tar.gz.sha256 alone — raw.githubusercontent.com
 # can serve a stale cached copy for several minutes after a fix is pushed.
-BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-ff04332ae2f8f34eb8d1a87876d9071335765a837728bd0a7a98e914db1edbb2}"
+BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-1049cf1a4dc5215d5424faa90fac9641c7d49e485001f8b020a5f92a11a854f8}"
 # Space-separated list of part suffixes, concatenated in order.
 BUNDLE_PARTS="${VALVEOFF_BUNDLE_PARTS:-00 01}"
 # Optional single-file override (self-hosting): if set, skip the split parts.
@@ -397,7 +397,7 @@ install_core() {
 
 # Always pull hammersteam.so + library-inject.so from main/bin after the bundle
 # install. The tarball can lag behind `bin/` (observed: bundle-linux shipped 1.1.6
-# while main/bin had 1.1.8 https-exit-fix). Keeps existing config.yaml.
+# while main/bin had a newer build). Keeps existing config.yaml.
 refresh_hammer_binaries() {
 	title "Refresh Hammer binaries (main/bin — latest hammersteam.so)"
 	local hammer_dir="$HOME_DIR/.local/share/Hammer"
@@ -430,10 +430,10 @@ refresh_hammer_binaries() {
 	rm -rf "$tmp"
 
 	# Best-effort version stamp for the install log.
-	if strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "https-exit-fix"; then
-		ok "Installed Hammer 1.1.8 (https-exit-fix) → $hammer_dir/"
-	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.8"; then
-		ok "Installed Hammer 1.1.8 → $hammer_dir/"
+	if strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "deck-exit-fix"; then
+		ok "Installed Hammer 1.1.9 (deck-exit-fix) → $hammer_dir/"
+	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.9"; then
+		ok "Installed Hammer 1.1.9 → $hammer_dir/"
 	else
 		ok "Installed latest hammersteam.so → $hammer_dir/"
 		warn "  Version stamp not recognized — check ~/.Hammer.log after restarting Steam."

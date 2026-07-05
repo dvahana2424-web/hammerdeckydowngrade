@@ -1,9 +1,9 @@
-build_date=2026-07-04
-hammer_version=1.1.8
-hammer_codename=https-exit-fix
+build_date=2026-07-05
+hammer_version=1.1.9
+hammer_codename=deck-exit-fix
 hammer_decky_version=0.9.14
-hammersteam_bytes=16840624
+hammersteam_bytes=16832116
 library_inject_bytes=26540
 steam_client_build=1782257239
-manifest_chain=wudrm->ost->worker->depotcache
-notes=Hammer 1.1.8 fixes HTTPS manifest crash during config reload and exit-time SIGSEGV/hang
+manifest_chain=wudrm->ost (config provider path, Game Mode safe)
+notes=Hammer 1.1.9 restores Wudrm/OST downloads on Deck Game Mode and fixes Steam exit hang (std::atexit + la_activity shutdown)
