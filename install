@@ -51,7 +51,7 @@ MAIN_RAW_BASE="https://raw.githubusercontent.com/$REPO/main"
 # Authoritative checksum for the concatenated bundle parts on `main`.
 # Do not rely on fetching valveoff-bundle.tar.gz.sha256 alone — raw.githubusercontent.com
 # can serve a stale cached copy for several minutes after a fix is pushed.
-BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-1049cf1a4dc5215d5424faa90fac9641c7d49e485001f8b020a5f92a11a854f8}"
+BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-2718a4f6eb01054a8127132f25cccf1c67ca6e2685d72fa8b1d21310a2aac606}"
 # Space-separated list of part suffixes, concatenated in order.
 BUNDLE_PARTS="${VALVEOFF_BUNDLE_PARTS:-00 01}"
 # Optional single-file override (self-hosting): if set, skip the split parts.
