@@ -1,6 +1,9 @@
 <#
     Hammer 3.8 - One-paste installer
     Usage (run in PowerShell):
+        irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@installer/install.ps1 | iex
+
+    Direct GitHub raw (if CDN is unavailable):
         irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/installer/install.ps1 | iex
 
     Downloads the Hammer 3.8 payload, installs it to
@@ -13,9 +16,13 @@ $ProgressPreference     = 'Continue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # ---- Config -------------------------------------------------------------
-$Branch     = 'installer'
-$RepoRaw    = "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/$Branch"
-$InstallUrl = "$RepoRaw/install.ps1"
+$Branch      = 'installer'
+$Repo        = 'dvahana2424-web/hammerdeckydowngrade'
+$InstallUrls = @(
+    "https://cdn.jsdelivr.net/gh/$Repo@$Branch/install.ps1",
+    "https://raw.githubusercontent.com/$Repo/$Branch/install.ps1"
+)
+$InstallUrl  = $InstallUrls[0]
 $InstallDir = "C:\Program Files (x86)\Hammer"
 $AppName    = 'Hammer 3.8'
 $Version    = '3.8'
@@ -56,56 +63,104 @@ function Format-Span([double]$seconds) {
     return ('{0:00}:{1:00}' -f $ts.Minutes, $ts.Seconds)
 }
 
-function Get-File($url, $dest, $label) {
-    for ($try = 1; $try -le 3; $try++) {
-        $resp = $null; $rs = $null; $fs = $null
-        try {
-            $req = [System.Net.HttpWebRequest]::Create($url)
-            $req.UserAgent        = 'HammerInstaller'
-            $req.Timeout          = 30000
-            $req.ReadWriteTimeout = 60000
-            $resp  = $req.GetResponse()
-            $total = [int64]$resp.ContentLength
-            $rs    = $resp.GetResponseStream()
-            $fs    = [System.IO.File]::Create($dest)
+function Get-PartUrls([string]$name) {
+    @(
+        "https://raw.githubusercontent.com/$Repo/$Branch/$name",
+        "https://github.com/$Repo/raw/$Branch/$name"
+    )
+}
 
-            $buf  = New-Object byte[] (262144)   # 256 KB
-            $read = [int64]0
-            $sw   = [System.Diagnostics.Stopwatch]::StartNew()
-            $lastMs = -1000.0
+function Get-RetryWaitSeconds([int]$attempt, [System.Net.WebException]$error) {
+    $retryAfter = 0
+    if ($error.Response) {
+        $retryAfter = [int]$error.Response.Headers['Retry-After']
+    }
+    if ($retryAfter -gt 0) { return $retryAfter }
+    return [math]::Min(120, 15 * $attempt)
+}
 
-            while (($n = $rs.Read($buf, 0, $buf.Length)) -gt 0) {
-                $fs.Write($buf, 0, $n)
-                $read += $n
-                $nowMs = $sw.Elapsed.TotalMilliseconds
-                if (($nowMs - $lastMs) -ge 250 -or $read -eq $total) {
-                    $lastMs = $nowMs
-                    $secs   = [math]::Max($sw.Elapsed.TotalSeconds, 0.001)
-                    $speed  = $read / $secs                       # bytes/sec
-                    $spd    = '{0:N1} MB/s' -f ($speed / 1MB)
-                    if ($total -gt 0) {
-                        $pct = [int][math]::Min(100, ($read / $total) * 100)
-                        $eta = if ($speed -gt 0) { Format-Span (($total - $read) / $speed) } else { '--:--' }
-                        $status = '{0:N1} / {1:N1} MB   {2}   ETA {3}' -f ($read/1MB), ($total/1MB), $spd, $eta
-                        Write-Progress -Activity $label -Status $status -PercentComplete $pct
-                    } else {
-                        Write-Progress -Activity $label -Status ('{0:N1} MB   {1}' -f ($read/1MB), $spd)
+function Get-File($urls, $dest, $label) {
+    $urlList  = @($urls)
+    $maxTries = 6
+    $lastErr  = $null
+
+    for ($try = 1; $try -le $maxTries; $try++) {
+        foreach ($url in $urlList) {
+            $resp = $null; $rs = $null; $fs = $null
+            try {
+                $req = [System.Net.HttpWebRequest]::Create($url)
+                $req.UserAgent        = 'HammerInstaller/3.8'
+                $req.Accept           = 'application/octet-stream,*/*'
+                $req.Timeout          = 30000
+                $req.ReadWriteTimeout = 120000
+                $resp  = $req.GetResponse()
+                $total = [int64]$resp.ContentLength
+                $rs    = $resp.GetResponseStream()
+                $fs    = [System.IO.File]::Create($dest)
+
+                $buf  = New-Object byte[] (262144)   # 256 KB
+                $read = [int64]0
+                $sw   = [System.Diagnostics.Stopwatch]::StartNew()
+                $lastMs = -1000.0
+
+                while (($n = $rs.Read($buf, 0, $buf.Length)) -gt 0) {
+                    $fs.Write($buf, 0, $n)
+                    $read += $n
+                    $nowMs = $sw.Elapsed.TotalMilliseconds
+                    if (($nowMs - $lastMs) -ge 250 -or $read -eq $total) {
+                        $lastMs = $nowMs
+                        $secs   = [math]::Max($sw.Elapsed.TotalSeconds, 0.001)
+                        $speed  = $read / $secs
+                        $spd    = '{0:N1} MB/s' -f ($speed / 1MB)
+                        if ($total -gt 0) {
+                            $pct = [int][math]::Min(100, ($read / $total) * 100)
+                            $eta = if ($speed -gt 0) { Format-Span (($total - $read) / $speed) } else { '--:--' }
+                            $status = '{0:N1} / {1:N1} MB   {2}   ETA {3}' -f ($read/1MB), ($total/1MB), $spd, $eta
+                            Write-Progress -Activity $label -Status $status -PercentComplete $pct
+                        } else {
+                            Write-Progress -Activity $label -Status ('{0:N1} MB   {1}' -f ($read/1MB), $spd)
+                        }
                     }
                 }
+                Write-Progress -Activity $label -Completed
+                return
+            } catch {
+                Write-Progress -Activity $label -Completed
+                $lastErr = $_
+                if (Test-Path $dest) { Remove-Item $dest -Force -ErrorAction SilentlyContinue }
+
+                $status = 0
+                if ($_.Exception -is [System.Net.WebException] -and $_.Exception.Response) {
+                    $status = [int]$_.Exception.Response.StatusCode
+                }
+                if ($status -eq 429) {
+                    $wait = Get-RetryWaitSeconds $try $_.Exception
+                    Write-Host "   GitHub rate limit (429). Waiting ${wait}s before retry $try/$maxTries ..." -ForegroundColor DarkYellow
+                    Start-Sleep -Seconds $wait
+                    break
+                }
+            } finally {
+                if ($fs)   { $fs.Close() }
+                if ($rs)   { $rs.Close() }
+                if ($resp) { $resp.Close() }
             }
-            Write-Progress -Activity $label -Completed
-            return
-        } catch {
-            Write-Progress -Activity $label -Completed
-            if ($try -eq 3) { throw }
-            Write-Host "   retry $try ..." -ForegroundColor DarkYellow
-            Start-Sleep -Seconds 2
-        } finally {
-            if ($fs)   { $fs.Close() }
-            if ($rs)   { $rs.Close() }
-            if ($resp) { $resp.Close() }
+        }
+
+        if ($lastErr -and $try -lt $maxTries) {
+            $status = 0
+            if ($lastErr.Exception -is [System.Net.WebException] -and $lastErr.Exception.Response) {
+                $status = [int]$lastErr.Exception.Response.StatusCode
+            }
+            if ($status -ne 429) {
+                Write-Host "   retry $try/$maxTries ..." -ForegroundColor DarkYellow
+                Start-Sleep -Seconds (3 * $try)
+            }
+            continue
         }
     }
+
+    if ($lastErr) { throw $lastErr }
+    throw "Download failed for $label"
 }
 
 try {
@@ -118,7 +173,7 @@ try {
         $dest  = Join-Path $work $p
         $label = "Downloading $AppName  -  part $i of $($Parts.Count)  ($p)"
         Write-Host ("  [{0}/{1}] {2}" -f $i, $Parts.Count, $p)
-        Get-File "$RepoRaw/$p" $dest $label
+        Get-File (Get-PartUrls $p) $dest $label
         $partFiles += $dest
     }
 
@@ -199,6 +254,12 @@ try {
 catch {
     Write-Host ""
     Write-Host "Installation failed: $($_.Exception.Message)" -ForegroundColor Red
+    if ($_.Exception.Message -match '429|Too Many Requests') {
+        Write-Host ""
+        Write-Host "GitHub raw rate-limited this IP. Try again in a few minutes, or download manually:" -ForegroundColor Yellow
+        Write-Host "  https://github.com/$Repo/tree/$Branch" -ForegroundColor Yellow
+        Write-Host "  Files: $($Parts -join ', ')" -ForegroundColor Yellow
+    }
     throw
 }
 finally {
