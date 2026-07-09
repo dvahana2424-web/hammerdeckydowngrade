@@ -18,8 +18,10 @@ $ProgressPreference     = 'Continue'
 # ---- Config -------------------------------------------------------------
 $Branch      = 'installer'
 $Repo        = 'dvahana2424-web/hammerdeckydowngrade'
+$ReleaseTag  = 'v3.8'
+$ScriptRev   = 'c5b9de0'
 $InstallUrls = @(
-    "https://cdn.jsdelivr.net/gh/$Repo@$Branch/install.ps1",
+    "https://cdn.jsdelivr.net/gh/$Repo@$ScriptRev/install.ps1",
     "https://raw.githubusercontent.com/$Repo/$Branch/install.ps1"
 )
 $InstallUrl  = $InstallUrls[0]
@@ -65,18 +67,27 @@ function Format-Span([double]$seconds) {
 
 function Get-PartUrls([string]$name) {
     @(
+        "https://github.com/$Repo/releases/download/$ReleaseTag/$name",
         "https://raw.githubusercontent.com/$Repo/$Branch/$name",
         "https://github.com/$Repo/raw/$Branch/$name"
     )
 }
 
-function Get-RetryWaitSeconds([int]$attempt, [System.Net.WebException]$error) {
+function Get-RetryWaitSeconds([int]$attempt, [System.Net.WebException]$webEx) {
     $retryAfter = 0
-    if ($error.Response) {
-        $retryAfter = [int]$error.Response.Headers['Retry-After']
+    if ($webEx.Response) {
+        $retryAfter = [int]$webEx.Response.Headers['Retry-After']
     }
     if ($retryAfter -gt 0) { return $retryAfter }
     return [math]::Min(120, 15 * $attempt)
+}
+
+function Get-FileCurl([string]$url, [string]$dest, [string]$label) {
+    if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) { return $false }
+    Write-Host "   using curl fallback ..." -ForegroundColor DarkGray
+    $code = & curl.exe -fL --retry 3 --retry-delay 5 -A 'HammerInstaller/3.8' -o $dest $url 2>&1
+    if ($LASTEXITCODE -ne 0) { return $false }
+    return (Test-Path $dest) -and ((Get-Item $dest).Length -gt 0)
 }
 
 function Get-File($urls, $dest, $label) {
@@ -152,6 +163,9 @@ function Get-File($urls, $dest, $label) {
                 $status = [int]$lastErr.Exception.Response.StatusCode
             }
             if ($status -ne 429) {
+                foreach ($url in $urlList) {
+                    if (Get-FileCurl $url $dest $label) { return }
+                }
                 Write-Host "   retry $try/$maxTries ..." -ForegroundColor DarkYellow
                 Start-Sleep -Seconds (3 * $try)
             }
@@ -256,9 +270,8 @@ catch {
     Write-Host "Installation failed: $($_.Exception.Message)" -ForegroundColor Red
     if ($_.Exception.Message -match '429|Too Many Requests') {
         Write-Host ""
-        Write-Host "GitHub raw rate-limited this IP. Try again in a few minutes, or download manually:" -ForegroundColor Yellow
-        Write-Host "  https://github.com/$Repo/tree/$Branch" -ForegroundColor Yellow
-        Write-Host "  Files: $($Parts -join ', ')" -ForegroundColor Yellow
+        Write-Host "Download rate-limited. Try again in a few minutes, or install manually from:" -ForegroundColor Yellow
+        Write-Host "  https://github.com/$Repo/releases/tag/$ReleaseTag" -ForegroundColor Yellow
     }
     throw
 }
