@@ -19,7 +19,7 @@ $ProgressPreference     = 'Continue'
 $Branch      = 'installer'
 $Repo        = 'dvahana2424-web/hammerdeckydowngrade'
 $ReleaseTag  = 'v3.8'
-$ScriptRev   = 'c5b9de0'
+$ScriptRev   = 'd1b2c46'
 $InstallUrls = @(
     "https://cdn.jsdelivr.net/gh/$Repo@$ScriptRev/install.ps1",
     "https://raw.githubusercontent.com/$Repo/$Branch/install.ps1"
