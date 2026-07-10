@@ -1,29 +1,29 @@
-﻿# Hammer 3.8 (fixed connection) — One-paste installer
+﻿# Hammer 3.8 (obfuscated) — One-paste installer
 
-Branch: [`Hammer-3.8-fixed-connection`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/Hammer-3.8-fixed-connection)
+Branch: [`Hammer-3.8-obfuscated`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/Hammer-3.8-obfuscated)
 
-> Git branch names cannot contain spaces/parentheses, so the branch is `Hammer-3.8-fixed-connection` (display name: **Hammer 3.8 (fixed connection)**).
+Based on `Hammer-3.8-fixed-connection`, with the **obfuscated** Hammer 3.8 build from `C:\Program Files (x86)\Hammer`.
 
 Open **Windows PowerShell** (a UAC admin prompt will appear automatically) and paste:
 
 ```powershell
-irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-fixed-connection/install.ps1 | iex
+irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-obfuscated/install.ps1 | iex
 ```
 
 jsDelivr alternate:
 
 ```powershell
-irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@Hammer-3.8-fixed-connection/install.ps1 | iex
+irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@Hammer-3.8-obfuscated/install.ps1 | iex
 ```
 
-Payload mirrors: [GitHub Release v3.8-fixed-connection](https://github.com/dvahana2424-web/hammerdeckydowngrade/releases/tag/v3.8-fixed-connection) (primary) and this branch.
+Payload mirrors: [GitHub Release v3.8-obfuscated](https://github.com/dvahana2424-web/hammerdeckydowngrade/releases/tag/v3.8-obfuscated) (primary) and this branch.
 
-## What changed in this build
+## What's in this build
 
-- Fixed false **"No internet / Slow connection"** license check (ValveOFF-style direct GitHub license GET, 25s timeout).
-- UI layout lock / centered controls when Windows forces maximize.
-- Extra off-layout controls hidden (matches clean Hammer 3.8 UI).
-- Embedded `hammer.ico` for exe / window icon.
+- License / connection fix (ValveOFF-style)
+- UI layout lock
+- Embedded `hammer.ico`
+- **Obfuscar** rename protection (self-contained, no separate .NET install)
 
 ## What it does
 
@@ -33,10 +33,6 @@ Payload mirrors: [GitHub Release v3.8-fixed-connection](https://github.com/dvaha
 4. Creates a Desktop shortcut **"Hammer 3.8"** using `hammer.ico`.
 5. Registers an entry in **Control Panel > Programs and Features** that uninstalls via `Uninstall.exe`.
 
-> Note: This is a Windows installer, so it uses PowerShell (`irm … | iex`) instead of `curl … | bash`.
-
 ## If you get HTTP 429
 
-The installer downloads payload files from the [v3.8-fixed-connection release](https://github.com/dvahana2424-web/hammerdeckydowngrade/releases/tag/v3.8-fixed-connection) first. If that fails, wait a few minutes and run the command again.
-
-Manual fallback: download `Hammer-3.8.zip.001` and `Hammer-3.8.zip.002` from the release page, concatenate them into `Hammer-3.8.zip`, then extract to `C:\Program Files (x86)\Hammer`.
+The installer downloads payload files from the [v3.8-obfuscated release](https://github.com/dvahana2424-web/hammerdeckydowngrade/releases/tag/v3.8-obfuscated) first. If that fails, wait a few minutes and run the command again.

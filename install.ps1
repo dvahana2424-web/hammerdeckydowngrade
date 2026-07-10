@@ -1,12 +1,12 @@
 <#
-    Hammer 3.8 (fixed connection) - One-paste installer
+    Hammer 3.8 (obfuscated) - One-paste installer
     Usage (run in PowerShell):
-        irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-fixed-connection/install.ps1 | iex
+        irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-obfuscated/install.ps1 | iex
 
     jsDelivr alternate:
-        irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@Hammer-3.8-fixed-connection/install.ps1 | iex
+        irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@Hammer-3.8-obfuscated/install.ps1 | iex
 
-    Downloads the Hammer 3.8 (fixed connection) payload, installs it to
+    Downloads the Hammer 3.8 obfuscated payload, installs it to
     "C:\Program Files (x86)\Hammer", creates a Desktop shortcut and
     registers an entry in Control Panel > Programs (Uninstall).
 #>
@@ -16,10 +16,10 @@ $ProgressPreference     = 'Continue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # ---- Config -------------------------------------------------------------
-$Branch      = 'Hammer-3.8-fixed-connection'
+$Branch      = 'Hammer-3.8-obfuscated'
 $BranchUrl   = [uri]::EscapeDataString($Branch)
 $Repo        = 'dvahana2424-web/hammerdeckydowngrade'
-$ReleaseTag  = 'v3.8-fixed-connection'
+$ReleaseTag  = 'v3.8-obfuscated'
 # Prefer stable branch raw URL for UAC re-launch (always latest on this branch).
 $InstallUrls = @(
     "https://raw.githubusercontent.com/$Repo/$BranchUrl/install.ps1",
@@ -28,7 +28,7 @@ $InstallUrls = @(
 $InstallUrl  = $InstallUrls[0]
 $InstallDir = "C:\Program Files (x86)\Hammer"
 $AppName    = 'Hammer 3.8'
-$Version    = '3.8-fixed'
+$Version    = '3.8-obfuscated'
 $Publisher  = 'Hammer'
 $Parts      = @('Hammer-3.8.zip.001', 'Hammer-3.8.zip.002')
 
@@ -51,7 +51,7 @@ if (-not $isAdmin) {
 }
 
 Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host "  Installing $AppName (fixed connection)" -ForegroundColor Cyan
+Write-Host "  Installing $AppName (obfuscated)" -ForegroundColor Cyan
 Write-Host "==============================================" -ForegroundColor Cyan
 
 # ---- Workspace ----------------------------------------------------------
@@ -86,7 +86,7 @@ function Get-RetryWaitSeconds([int]$attempt, [System.Net.WebException]$webEx) {
 function Get-FileCurl([string]$url, [string]$dest, [string]$label) {
     if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) { return $false }
     Write-Host "   using curl fallback ..." -ForegroundColor DarkGray
-    $null = & curl.exe -fL --retry 3 --retry-delay 5 -A 'HammerInstaller/3.8-fixed' -o $dest $url 2>&1
+    $null = & curl.exe -fL --retry 3 --retry-delay 5 -A 'HammerInstaller/3.8-obfuscated' -o $dest $url 2>&1
     if ($LASTEXITCODE -ne 0) { return $false }
     return (Test-Path $dest) -and ((Get-Item $dest).Length -gt 0)
 }
@@ -101,7 +101,7 @@ function Get-File($urls, $dest, $label) {
             $resp = $null; $rs = $null; $fs = $null
             try {
                 $req = [System.Net.HttpWebRequest]::Create($url)
-                $req.UserAgent        = 'HammerInstaller/3.8-fixed'
+                $req.UserAgent        = 'HammerInstaller/3.8-obfuscated'
                 $req.Accept           = 'application/octet-stream,*/*'
                 $req.Timeout          = 30000
                 $req.ReadWriteTimeout = 120000
@@ -240,7 +240,7 @@ try {
     $sc.TargetPath       = $exePath
     $sc.WorkingDirectory = $InstallDir
     if (Test-Path $icoPath) { $sc.IconLocation = $icoPath }
-    $sc.Description      = "$AppName (fixed connection)"
+    $sc.Description      = "$AppName (obfuscated)"
     $sc.Save()
 
     # ---- Control Panel uninstall entry ----------------------------------
@@ -249,7 +249,7 @@ try {
     if (-not (Test-Path $regKey)) { New-Item -Path $regKey -Force | Out-Null }
     $size = [math]::Round(((Get-ChildItem $InstallDir -Recurse -File -ErrorAction SilentlyContinue |
              Measure-Object Length -Sum).Sum / 1KB))
-    New-ItemProperty -Path $regKey -Name 'DisplayName'     -Value "$AppName (fixed connection)" -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $regKey -Name 'DisplayName'     -Value "$AppName (obfuscated)" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $regKey -Name 'DisplayVersion'  -Value $Version    -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $regKey -Name 'Publisher'       -Value $Publisher  -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $regKey -Name 'DisplayIcon'     -Value $icoPath    -PropertyType String -Force | Out-Null
@@ -261,7 +261,7 @@ try {
 
     Write-Host ""
     Write-Host "==============================================" -ForegroundColor Green
-    Write-Host "  $AppName (fixed connection) installed!" -ForegroundColor Green
+    Write-Host "  $AppName (obfuscated) installed!" -ForegroundColor Green
     Write-Host "  Location : $InstallDir" -ForegroundColor Green
     Write-Host "  Shortcut : $lnk" -ForegroundColor Green
     Write-Host "==============================================" -ForegroundColor Green
