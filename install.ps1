@@ -1,12 +1,12 @@
 <#
-    Hammer 3.8 (fixed connection) - One-paste installer
+    Hammer-3.8-fixed-connection - One-paste installer
     Usage (run in PowerShell):
         irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@66e5d4535e2df5e7ab32a6717dff7c1b9fda191a/install.ps1 | iex
 
     Direct GitHub raw (if CDN is unavailable):
-        irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer%203.8%20(fixed%20connection)/install.ps1 | iex
+        irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-fixed-connection/install.ps1 | iex
 
-    Downloads the Hammer 3.8 (fixed connection) payload, installs it to
+    Downloads the Hammer-3.8-fixed-connection payload, installs it to
     "C:\Program Files (x86)\Hammer", creates a Desktop shortcut and
     registers an entry in Control Panel > Programs (Uninstall).
 #>
@@ -16,7 +16,7 @@ $ProgressPreference     = 'Continue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # ---- Config -------------------------------------------------------------
-$Branch      = 'Hammer 3.8 (fixed connection)'
+$Branch      = 'Hammer-3.8-fixed-connection'
 $BranchUrl   = [uri]::EscapeDataString($Branch)
 $Repo        = 'dvahana2424-web/hammerdeckydowngrade'
 $ReleaseTag  = 'v3.8-fixed-connection'

