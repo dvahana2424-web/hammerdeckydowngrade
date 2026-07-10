@@ -1,7 +1,7 @@
 <#
     Hammer-3.8-fixed-connection - One-paste installer
     Usage (run in PowerShell):
-        irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@66e5d4535e2df5e7ab32a6717dff7c1b9fda191a/install.ps1 | iex
+        irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@5c36424/install.ps1 | iex
 
     Direct GitHub raw (if CDN is unavailable):
         irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-fixed-connection/install.ps1 | iex
