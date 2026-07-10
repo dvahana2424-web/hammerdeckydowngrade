@@ -1,12 +1,12 @@
 <#
-    Hammer 3.8 - One-paste installer
+    Hammer 3.8 (fixed connection) - One-paste installer
     Usage (run in PowerShell):
-        irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@installer/install.ps1 | iex
+        irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@BRANCHSHA/install.ps1 | iex
 
     Direct GitHub raw (if CDN is unavailable):
-        irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/installer/install.ps1 | iex
+        irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer%203.8%20(fixed%20connection)/install.ps1 | iex
 
-    Downloads the Hammer 3.8 payload, installs it to
+    Downloads the Hammer 3.8 (fixed connection) payload, installs it to
     "C:\Program Files (x86)\Hammer", creates a Desktop shortcut and
     registers an entry in Control Panel > Programs (Uninstall).
 #>
@@ -16,18 +16,19 @@ $ProgressPreference     = 'Continue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # ---- Config -------------------------------------------------------------
-$Branch      = 'installer'
+$Branch      = 'Hammer 3.8 (fixed connection)'
+$BranchUrl   = [uri]::EscapeDataString($Branch)
 $Repo        = 'dvahana2424-web/hammerdeckydowngrade'
-$ReleaseTag  = 'v3.8'
-$ScriptRev   = 'd1b2c46'
+$ReleaseTag  = 'v3.8-fixed-connection'
+$ScriptRev   = 'BRANCHSHA'
 $InstallUrls = @(
     "https://cdn.jsdelivr.net/gh/$Repo@$ScriptRev/install.ps1",
-    "https://raw.githubusercontent.com/$Repo/$Branch/install.ps1"
+    "https://raw.githubusercontent.com/$Repo/$BranchUrl/install.ps1"
 )
 $InstallUrl  = $InstallUrls[0]
 $InstallDir = "C:\Program Files (x86)\Hammer"
 $AppName    = 'Hammer 3.8'
-$Version    = '3.8'
+$Version    = '3.8-fixed'
 $Publisher  = 'Hammer'
 $Parts      = @('Hammer-3.8.zip.001', 'Hammer-3.8.zip.002')
 
@@ -50,11 +51,11 @@ if (-not $isAdmin) {
 }
 
 Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host "  Installing $AppName" -ForegroundColor Cyan
+Write-Host "  Installing $AppName (fixed connection)" -ForegroundColor Cyan
 Write-Host "==============================================" -ForegroundColor Cyan
 
 # ---- Workspace ----------------------------------------------------------
-$work = Join-Path $env:TEMP ("hammer38_" + [Guid]::NewGuid().ToString('N'))
+$work = Join-Path $env:TEMP ("hammer38fix_" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work -Force | Out-Null
 $zipPath = Join-Path $work 'Hammer-3.8.zip'
 
@@ -68,8 +69,8 @@ function Format-Span([double]$seconds) {
 function Get-PartUrls([string]$name) {
     @(
         "https://github.com/$Repo/releases/download/$ReleaseTag/$name",
-        "https://raw.githubusercontent.com/$Repo/$Branch/$name",
-        "https://github.com/$Repo/raw/$Branch/$name"
+        "https://raw.githubusercontent.com/$Repo/$BranchUrl/$name",
+        "https://github.com/$Repo/raw/$BranchUrl/$name"
     )
 }
 
@@ -85,7 +86,7 @@ function Get-RetryWaitSeconds([int]$attempt, [System.Net.WebException]$webEx) {
 function Get-FileCurl([string]$url, [string]$dest, [string]$label) {
     if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) { return $false }
     Write-Host "   using curl fallback ..." -ForegroundColor DarkGray
-    $code = & curl.exe -fL --retry 3 --retry-delay 5 -A 'HammerInstaller/3.8' -o $dest $url 2>&1
+    $null = & curl.exe -fL --retry 3 --retry-delay 5 -A 'HammerInstaller/3.8-fixed' -o $dest $url 2>&1
     if ($LASTEXITCODE -ne 0) { return $false }
     return (Test-Path $dest) -and ((Get-Item $dest).Length -gt 0)
 }
@@ -100,7 +101,7 @@ function Get-File($urls, $dest, $label) {
             $resp = $null; $rs = $null; $fs = $null
             try {
                 $req = [System.Net.HttpWebRequest]::Create($url)
-                $req.UserAgent        = 'HammerInstaller/3.8'
+                $req.UserAgent        = 'HammerInstaller/3.8-fixed'
                 $req.Accept           = 'application/octet-stream,*/*'
                 $req.Timeout          = 30000
                 $req.ReadWriteTimeout = 120000
@@ -239,7 +240,7 @@ try {
     $sc.TargetPath       = $exePath
     $sc.WorkingDirectory = $InstallDir
     if (Test-Path $icoPath) { $sc.IconLocation = $icoPath }
-    $sc.Description      = $AppName
+    $sc.Description      = "$AppName (fixed connection)"
     $sc.Save()
 
     # ---- Control Panel uninstall entry ----------------------------------
@@ -248,7 +249,7 @@ try {
     if (-not (Test-Path $regKey)) { New-Item -Path $regKey -Force | Out-Null }
     $size = [math]::Round(((Get-ChildItem $InstallDir -Recurse -File -ErrorAction SilentlyContinue |
              Measure-Object Length -Sum).Sum / 1KB))
-    New-ItemProperty -Path $regKey -Name 'DisplayName'     -Value $AppName    -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $regKey -Name 'DisplayName'     -Value "$AppName (fixed connection)" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $regKey -Name 'DisplayVersion'  -Value $Version    -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $regKey -Name 'Publisher'       -Value $Publisher  -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $regKey -Name 'DisplayIcon'     -Value $icoPath    -PropertyType String -Force | Out-Null
@@ -260,7 +261,7 @@ try {
 
     Write-Host ""
     Write-Host "==============================================" -ForegroundColor Green
-    Write-Host "  $AppName installed successfully!" -ForegroundColor Green
+    Write-Host "  $AppName (fixed connection) installed!" -ForegroundColor Green
     Write-Host "  Location : $InstallDir" -ForegroundColor Green
     Write-Host "  Shortcut : $lnk" -ForegroundColor Green
     Write-Host "==============================================" -ForegroundColor Green
