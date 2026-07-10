@@ -3,7 +3,7 @@
 Open **Windows PowerShell** (a UAC admin prompt will appear automatically) and paste:
 
 ```powershell
-irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@1c1c594a1892f78cf3b17402e1a0444b3b7f5b4f/install.ps1 | iex
+irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@e45a99606aa127f0453e33c4869594863a5bd7c4/install.ps1 | iex
 ```
 
 Direct GitHub raw (alternate):
