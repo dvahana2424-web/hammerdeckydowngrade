@@ -1,7 +1,7 @@
 <#
     Hammer 3.8 (fixed connection) - One-paste installer
     Usage (run in PowerShell):
-        irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@e45a99606aa127f0453e33c4869594863a5bd7c4/install.ps1 | iex
+        irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@66e5d4535e2df5e7ab32a6717dff7c1b9fda191a/install.ps1 | iex
 
     Direct GitHub raw (if CDN is unavailable):
         irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer%203.8%20(fixed%20connection)/install.ps1 | iex
@@ -20,7 +20,7 @@ $Branch      = 'Hammer 3.8 (fixed connection)'
 $BranchUrl   = [uri]::EscapeDataString($Branch)
 $Repo        = 'dvahana2424-web/hammerdeckydowngrade'
 $ReleaseTag  = 'v3.8-fixed-connection'
-$ScriptRev   = 'e45a99606aa127f0453e33c4869594863a5bd7c4'
+$ScriptRev   = '66e5d4535e2df5e7ab32a6717dff7c1b9fda191a'
 $InstallUrls = @(
     "https://cdn.jsdelivr.net/gh/$Repo@$ScriptRev/install.ps1",
     "https://raw.githubusercontent.com/$Repo/$BranchUrl/install.ps1"
