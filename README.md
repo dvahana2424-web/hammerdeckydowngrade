@@ -21,9 +21,12 @@ Payload mirrors: [GitHub Release v3.8-obfuscated](https://github.com/dvahana2424
 ## What's in this build
 
 - License / connection fix (ValveOFF-style)
-- UI layout lock
+- UI layout lock (minimize works; no forced fullscreen)
+- Delete Game IDs: title filter, fixed first-row overlap, deletes unlock lua + auto Steam restart
 - Embedded `hammer.ico`
 - **Obfuscar** rename protection (self-contained, no separate .NET install)
+
+Payload refreshed from `C:\Program Files (x86)\Hammer\Hammer.exe` (latest obfuscated build).
 
 ## What it does
 
