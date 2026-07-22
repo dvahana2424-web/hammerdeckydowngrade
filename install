@@ -34,10 +34,10 @@
 set -uo pipefail
 
 # Re-fetch this script when launched via a stale CDN copy (e.g. old checksum logic).
-# valveoff-install-rev=7
-if [ "${VALVEOFF_INSTALL_REV:-}" != "7" ]; then
-	export VALVEOFF_INSTALL_REV=7
-	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/install?rev=7&ts=$(date +%s)")
+# valveoff-install-rev=8
+if [ "${VALVEOFF_INSTALL_REV:-}" != "8" ]; then
+	export VALVEOFF_INSTALL_REV=8
+	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/install?rev=8&ts=$(date +%s)")
 fi
 
 # ── Config ──────────────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ BUNDLE_FILE="valveoff-bundle.tar.gz"
 BUNDLE_RAW_BASE="${VALVEOFF_BUNDLE_RAW_BASE:-https://raw.githubusercontent.com/$REPO/$BUNDLE_BRANCH}"
 BRANCH_RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 # Authoritative checksum for the concatenated bundle parts on `valveoff-1.5`.
-BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-aa29bd34b00f13274b41047f365b8b838717c592f0d2ce0d3618738e987f715a}"
+BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-41f947be7f502cd290c8559e226da55fa35b8f180ed53c4eac45958cd81f18d7}"
 # Space-separated list of part suffixes, concatenated in order.
 BUNDLE_PARTS="${VALVEOFF_BUNDLE_PARTS:-00 01}"
 # Optional single-file override (self-hosting): if set, skip the split parts.
