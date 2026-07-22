@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
-# update-hammer-decky.sh — install hammer-decky from the split ValveOFF bundle.
-# This public repo does NOT host plugin source and has NO GitHub Release — the
-# compiled bundle lives as split raw files on `main` (legacy `bundle-linux` may lag).
+# update-hammer-decky.sh — install hammer-decky from the split ValveOFF 1.5 bundle.
 #
 # Usage:
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/update-hammer-decky.sh | bash
+#
+# ValveOFF 1.4 (main):
 #   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer-decky.sh | bash
 #
 set -euo pipefail
 
 REPO="dvahana2424-web/hammerdeckydowngrade"
-BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-main}"
+BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-valveoff-1.5}"
 BUNDLE_FILE="valveoff-bundle.tar.gz"
 BUNDLE_RAW_BASE="${VALVEOFF_BUNDLE_RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${BUNDLE_BRANCH}}"
 BUNDLE_PARTS="${VALVEOFF_BUNDLE_PARTS:-00 01}"
 BUNDLE_URL="${VALVEOFF_BUNDLE_URL:-}"
-BUNDLE_DIRNAME="ValveOFF 1.4"
+BUNDLE_DIRNAME="ValveOFF 1.5"
 PLUGIN_DST="${HOME}/homebrew/plugins/hammer-decky"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "[ERR] need $1" >&2; exit 1; }; }

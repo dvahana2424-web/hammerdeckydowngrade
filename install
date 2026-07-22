@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-#  ValveOFF — ONE-PASTE installer (SteamOS / Bazzite / any Linux)
+#  ValveOFF 1.5 — ONE-PASTE installer (SteamOS / Bazzite / any Linux)
 #
 #  Usage (Desktop Mode → Konsole, do NOT run as root):
 #
-#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/bootstrap | bash
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
 #
 #  Prefer `bootstrap` over `install` directly — GitHub raw CDN can serve a stale
 #  `install` copy for several minutes after an update (checksum / logic fixes).
 #
 #  Legacy (may hit CDN cache on Steam Deck):
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/install | bash
+#
+#  ValveOFF 1.4 (unchanged — do NOT use this branch for 1.4):
 #    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install | bash
 #
 #  What this does, fully automatic, ONE sudo password prompt:
@@ -31,32 +34,28 @@
 set -uo pipefail
 
 # Re-fetch this script when launched via a stale CDN copy (e.g. old checksum logic).
-# valveoff-install-rev=6
-if [ "${VALVEOFF_INSTALL_REV:-}" != "6" ]; then
-	export VALVEOFF_INSTALL_REV=6
-	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install?rev=6&ts=$(date +%s)")
+# valveoff-install-rev=7
+if [ "${VALVEOFF_INSTALL_REV:-}" != "7" ]; then
+	export VALVEOFF_INSTALL_REV=7
+	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/install?rev=7&ts=$(date +%s)")
 fi
 
 # ── Config ──────────────────────────────────────────────────────────────────
-# The payload is hosted as split (<100 MB) raw files on the `main` branch
-# (legacy `bundle-linux` branch may lag — do not point one-paste installs there).
+# ValveOFF 1.5 branch — separate from main (ValveOFF 1.4). Do not point 1.4
+# installs here; use `main` for 1.4.
 REPO="dvahana2424-web/hammerdeckydowngrade"
-# Default to `main` — it ships the current ValveOFF bundle parts + matches
-# `bin/hammersteam.so`. The legacy `bundle-linux` branch lagged behind (1.1.6)
-# and caused one-paste installs to deploy stale Hammer binaries.
-BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-main}"
+BRANCH="valveoff-1.5"
+BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-$BRANCH}"
 BUNDLE_FILE="valveoff-bundle.tar.gz"
 BUNDLE_RAW_BASE="${VALVEOFF_BUNDLE_RAW_BASE:-https://raw.githubusercontent.com/$REPO/$BUNDLE_BRANCH}"
-MAIN_RAW_BASE="https://raw.githubusercontent.com/$REPO/main"
-# Authoritative checksum for the concatenated bundle parts on `main`.
-# Do not rely on fetching valveoff-bundle.tar.gz.sha256 alone — raw.githubusercontent.com
-# can serve a stale cached copy for several minutes after a fix is pushed.
-BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-2718a4f6eb01054a8127132f25cccf1c67ca6e2685d72fa8b1d21310a2aac606}"
+BRANCH_RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
+# Authoritative checksum for the concatenated bundle parts on `valveoff-1.5`.
+BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-aa29bd34b00f13274b41047f365b8b838717c592f0d2ce0d3618738e987f715a}"
 # Space-separated list of part suffixes, concatenated in order.
 BUNDLE_PARTS="${VALVEOFF_BUNDLE_PARTS:-00 01}"
 # Optional single-file override (self-hosting): if set, skip the split parts.
 BUNDLE_URL="${VALVEOFF_BUNDLE_URL:-}"
-BUNDLE_DIRNAME="ValveOFF 1.4"   # folder name created inside Downloads/
+BUNDLE_DIRNAME="ValveOFF 1.5"   # folder name created inside Downloads/
 
 # ── Colors (no-op when not a tty) ───────────────────────────────────────────
 if [ -t 1 ]; then
@@ -395,27 +394,26 @@ install_core() {
 		|| warn "Core install reported a non-zero exit — see messages above."
 }
 
-# Always pull hammersteam.so + library-inject.so from main/bin after the bundle
-# install. The tarball can lag behind `bin/` (observed: bundle-linux shipped 1.1.6
-# while main/bin had a newer build). Keeps existing config.yaml.
+# Always pull hammersteam.so + library-inject.so from valveoff-1.5/bin after the
+# bundle install. The tarball can lag behind `bin/` on the same branch.
 refresh_hammer_binaries() {
-	title "Refresh Hammer binaries (main/bin — latest hammersteam.so)"
+	title "Refresh Hammer binaries (valveoff-1.5/bin — latest hammersteam.so)"
 	local hammer_dir="$HOME_DIR/.local/share/Hammer"
 	local tmp
 	tmp="$(mktemp -d "${TMPDIR:-/tmp}/valveoff-hammer.XXXXXX")"
 
 	mkdir -p "$hammer_dir"
-	info "Downloading hammersteam.so + library-inject.so from $MAIN_RAW_BASE/bin/ …"
+	info "Downloading hammersteam.so + library-inject.so from $BRANCH_RAW_BASE/bin/ …"
 
 	if ! curl -fsSL --retry 3 --retry-delay 2 \
-		-o "$tmp/hammersteam.so" "$MAIN_RAW_BASE/bin/hammersteam.so"; then
+		-o "$tmp/hammersteam.so" "$BRANCH_RAW_BASE/bin/hammersteam.so"; then
 		rm -rf "$tmp"
 		warn "Could not download hammersteam.so — bundle copy left in place."
-		warn "  Run later: curl -fsSL $MAIN_RAW_BASE/update-hammer.sh | bash"
+		warn "  Run later: curl -fsSL $BRANCH_RAW_BASE/update-hammer.sh | bash"
 		return 1
 	fi
 	if ! curl -fsSL --retry 3 --retry-delay 2 \
-		-o "$tmp/library-inject.so" "$MAIN_RAW_BASE/bin/library-inject.so"; then
+		-o "$tmp/library-inject.so" "$BRANCH_RAW_BASE/bin/library-inject.so"; then
 		rm -rf "$tmp"
 		warn "Could not download library-inject.so — bundle copy left in place."
 		return 1
@@ -430,10 +428,12 @@ refresh_hammer_binaries() {
 	rm -rf "$tmp"
 
 	# Best-effort version stamp for the install log.
-	if strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "deck-exit-fix"; then
-		ok "Installed Hammer 1.1.9 (deck-exit-fix) → $hammer_dir/"
-	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.9"; then
-		ok "Installed Hammer 1.1.9 → $hammer_dir/"
+	if strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.10"; then
+		ok "Installed Hammer 1.1.10 (manifest-pin) → $hammer_dir/"
+	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "manifest-pin"; then
+		ok "Installed Hammer manifest-pin build → $hammer_dir/"
+	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.9-manifest"; then
+		ok "Installed Hammer 1.1.9-manifest → $hammer_dir/"
 	else
 		ok "Installed latest hammersteam.so → $hammer_dir/"
 		warn "  Version stamp not recognized — check ~/.Hammer.log after restarting Steam."
@@ -502,7 +502,7 @@ apply_gamemode_unlock() {
 #  MAIN
 # ═════════════════════════════════════════════════════════════════════════════
 main() {
-	title "ValveOFF one-paste installer"
+	title "ValveOFF 1.5 one-paste installer"
 	info "User: $USER_NAME    Home: $HOME_DIR"
 	info "Downloads: $DL_DIR"
 	detect_distro

@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# ValveOFF one-paste bootstrap — fetches a fresh install script every run.
+# ValveOFF 1.5 one-paste bootstrap — fetches a fresh install script every run.
 # GitHub raw.githubusercontent.com caches files per edge for several minutes;
-# piping `main/install` directly can hit a stale copy. Use this URL for
+# piping `valveoff-1.5/install` directly can hit a stale copy. Use this URL for
 # tinyurl / bookmarks instead of `install` directly:
 #
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
+#
+# ValveOFF 1.4 (unchanged on main):
 #   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/bootstrap | bash
 #
 set -uo pipefail
 REPO="${VALVEOFF_REPO:-dvahana2424-web/hammerdeckydowngrade}"
-BRANCH="${VALVEOFF_BRANCH:-main}"
-export VALVEOFF_INSTALL_REV=6
+BRANCH="${VALVEOFF_BRANCH:-valveoff-1.5}"
+export VALVEOFF_INSTALL_REV=7
 exec bash <(curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/install?ts=$(date +%s)")

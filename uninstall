@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-#  ValveOFF — ONE-PASTE uninstall (SteamOS / Bazzite / Linux)
+#  ValveOFF 1.5 — ONE-PASTE uninstall (SteamOS / Bazzite / Linux)
 #
 #  Usage (Desktop Mode → Konsole, do NOT run as root):
 #
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/uninstall | bash
+#
+#  ValveOFF 1.4 (main — unchanged):
 #    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/uninstall | bash
 #
 #  Removes Hammer + ValveOFF + hammer-decky + desktop/game-mode unlock hooks.
@@ -14,7 +17,7 @@
 set -uo pipefail
 
 HOME_DIR="${HOME:-$HOME}"
-BUNDLE_DIRNAME="ValveOFF 1.4"
+BUNDLE_DIRNAME="ValveOFF 1.5"
 
 # ── Colors ──────────────────────────────────────────────────────────────────
 if [ -t 1 ]; then

@@ -42,6 +42,10 @@ ExtendedLogging: yes
 ManifestHookEnabled: yes
 ManifestPattern: "e8 ? ? ? ? 05 ? ? ? ? 55 89 e5 57 56 53 81 ec 10 01 00"
 GetManifestRequestCodeOffset: 0x1341890
+ManifestPinEnabled: yes
+ManifestPinDisabledApps: []
+BuildDepotDependencyOffset: 0xfe5040
+BuildDepotDependencyPattern: "55 89 e5 57 56 e8 ? ? ? ? 81 c6 ? ? ? ? 53 81 ec 2c 02 00 00"
 ManifestProvider: Ost
 ManifestFallbackProvider: yes
 ManifestLocalCacheFallback: yes
