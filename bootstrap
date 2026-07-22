@@ -12,5 +12,5 @@
 set -uo pipefail
 REPO="${VALVEOFF_REPO:-dvahana2424-web/hammerdeckydowngrade}"
 BRANCH="${VALVEOFF_BRANCH:-valveoff-1.5}"
-export VALVEOFF_INSTALL_REV=8
+export VALVEOFF_INSTALL_REV=9
 exec bash <(curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/install?ts=$(date +%s)")
