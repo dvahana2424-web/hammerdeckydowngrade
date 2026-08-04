@@ -1,64 +1,35 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-#  ValveOFF — ONE-PASTE installer (SteamOS / Bazzite / any Linux)
+#  Crimson Desert bin64 pack — ONE-PASTE installer (SteamOS / Bazzite / Linux)
 #
 #  Usage (Desktop Mode → Konsole, do NOT run as root):
 #
-#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/bootstrap | bash
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/crimson-desert/bootstrap | bash
 #
-#  Prefer `bootstrap` over `install` directly — GitHub raw CDN can serve a stale
-#  `install` copy for several minutes after an update (checksum / logic fixes).
-#
-#  Legacy (may hit CDN cache on Steam Deck):
-#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install | bash
-#
-#  What this does, fully automatic, ONE sudo password prompt:
-#    1. Detects the host (SteamOS / Bazzite / generic Linux).
-#    2. SMART CLEANUP of any previous OneTap / SLSsteam install:
-#         • removes its Desktop-Mode unlock (.desktop + LD_AUDIT wrappers)
-#         • removes its Game-Mode unlock (LD_AUDIT in steam-jupiter / steam)
-#         • deletes steam.cfg  → re-enables Steam auto-update
-#         • removes ~/.local/share/SLSsteam and ~/.config/SLSsteam
-#    3. Downloads the ValveOFF bundle into your Downloads folder.
-#    4. Installs Decky Loader (latest) if it isn't already present.
-#    5. Installs Hammer + ValveOFF + hammer-decky and wires Desktop-Mode unlock.
-#    6. Applies Game-Mode unlock (steam-jupiter on SteamOS, /usr/local/bin/steam
-#       wrapper on Bazzite/atomic).
-#
-#  Override the bundle source if you self-host:
-#    VALVEOFF_BUNDLE_URL=https://example/valveoff-bundle.tar.gz curl ... | bash
+#  Downloads crimson.rar, verifies SHA256, extracts into the existing Steam
+#  installdir for Crimson Desert (AppID 3321460). Aborts if that folder is
+#  not found — install / create the game slot in Steam first.
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
-# Re-fetch this script when launched via a stale CDN copy (e.g. old checksum logic).
-# valveoff-install-rev=6
-if [ "${VALVEOFF_INSTALL_REV:-}" != "6" ]; then
-	export VALVEOFF_INSTALL_REV=6
-	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install?rev=6&ts=$(date +%s)")
+if [ "${CRIMSON_INSTALL_REV:-}" != "1" ]; then
+	export CRIMSON_INSTALL_REV=1
+	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/crimson-desert/install?rev=1&ts=$(date +%s)")
 fi
 
-# ── Config ──────────────────────────────────────────────────────────────────
-# The payload is hosted as split (<100 MB) raw files on the `main` branch
-# (legacy `bundle-linux` branch may lag — do not point one-paste installs there).
-REPO="dvahana2424-web/hammerdeckydowngrade"
-# Default to `main` — it ships the current ValveOFF bundle parts + matches
-# `bin/hammersteam.so`. The legacy `bundle-linux` branch lagged behind (1.1.6)
-# and caused one-paste installs to deploy stale Hammer binaries.
-BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-main}"
-BUNDLE_FILE="valveoff-bundle.tar.gz"
-BUNDLE_RAW_BASE="${VALVEOFF_BUNDLE_RAW_BASE:-https://raw.githubusercontent.com/$REPO/$BUNDLE_BRANCH}"
-MAIN_RAW_BASE="https://raw.githubusercontent.com/$REPO/main"
-# Authoritative checksum for the concatenated bundle parts on `main`.
-# Do not rely on fetching valveoff-bundle.tar.gz.sha256 alone — raw.githubusercontent.com
-# can serve a stale cached copy for several minutes after a fix is pushed.
-BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-2718a4f6eb01054a8127132f25cccf1c67ca6e2685d72fa8b1d21310a2aac606}"
-# Space-separated list of part suffixes, concatenated in order.
-BUNDLE_PARTS="${VALVEOFF_BUNDLE_PARTS:-00 01}"
-# Optional single-file override (self-hosting): if set, skip the split parts.
-BUNDLE_URL="${VALVEOFF_BUNDLE_URL:-}"
-BUNDLE_DIRNAME="ValveOFF 1.4"   # folder name created inside Downloads/
+# ── Config ────────────────────────────────────────────────────────────────────
+REPO="${CRIMSON_REPO:-dvahana2424-web/hammerdeckydowngrade}"
+BRANCH="${CRIMSON_BRANCH:-crimson-desert}"
+ARCHIVE_FILE="crimson.rar"
+RAW_BASE="${CRIMSON_RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${BRANCH}}"
+ARCHIVE_SHA256="${CRIMSON_SHA256:-88686bdc9567f6324046f225055b79572997f7c46064bb84a3079e941fc49450}"
+ARCHIVE_PARTS="${CRIMSON_PARTS:-00 01}"
+ARCHIVE_URL="${CRIMSON_ARCHIVE_URL:-}"
 
-# ── Colors (no-op when not a tty) ───────────────────────────────────────────
+STEAM_APP_ID="3321460"
+DEFAULT_INSTALL_DIR="Crimson Desert"
+
+# ── Colors ────────────────────────────────────────────────────────────────────
 if [ -t 1 ]; then
 	C_RST=$'\033[0m'; C_B=$'\033[1m'; C_G=$'\033[32m'; C_Y=$'\033[33m'
 	C_R=$'\033[31m'; C_C=$'\033[36m'
@@ -72,472 +43,267 @@ info()  { printf "%s[..]%s   %s\n"  "$C_C" "$C_RST" "$*"; }
 title() { printf "\n%s━━ %s ━━%s\n" "$C_B" "$*" "$C_RST"; }
 die()   { err "$*"; exit 1; }
 
-# ── Pre-flight ──────────────────────────────────────────────────────────────
+# ── Pre-flight ────────────────────────────────────────────────────────────────
 if [ "$(id -u)" = "0" ]; then
-	die "Do NOT run this as root. Paste it in Konsole as your normal user (deck / bazzite / etc.). It will ask for sudo once."
+	die "Do NOT run as root. Paste in Konsole as your normal user (deck / bazzite)."
 fi
-command -v curl >/dev/null 2>&1 || die "curl is required but not found."
-command -v tar  >/dev/null 2>&1 || die "tar is required but not found."
+command -v curl >/dev/null 2>&1 || die "curl is required."
+need_extract() {
+	command -v 7z  >/dev/null 2>&1 && return 0
+	command -v 7zz >/dev/null 2>&1 && return 0
+	command -v 7za >/dev/null 2>&1 && return 0
+	return 1
+}
+need_extract || die "7-Zip is required (install p7zip / 7zip package, or use SteamOS Desktop Mode)."
 
-HOME_DIR="$HOME"
-USER_NAME="$(id -un)"
+resolve_7z() {
+	command -v 7z  >/dev/null 2>&1 && { echo "7z";  return 0; }
+	command -v 7zz >/dev/null 2>&1 && { echo "7zz"; return 0; }
+	command -v 7za >/dev/null 2>&1 && { echo "7za"; return 0; }
+	return 1
+}
 
-# Resolve the Downloads folder (respect localized XDG dirs; fall back to ~/Downloads).
 resolve_downloads_dir() {
 	local d=""
 	if command -v xdg-user-dir >/dev/null 2>&1; then
 		d="$(xdg-user-dir DOWNLOAD 2>/dev/null || true)"
 	fi
-	[ -z "$d" ] && d="$HOME_DIR/Downloads"
+	[ -z "$d" ] && d="$HOME/Downloads"
 	mkdir -p "$d" 2>/dev/null || true
 	echo "$d"
 }
-DL_DIR="$(resolve_downloads_dir)"
-DEST="$DL_DIR/$BUNDLE_DIRNAME"
 
-# ── Distro detection ────────────────────────────────────────────────────────
-IS_STEAMOS=0; IS_BAZZITE=0; IS_ATOMIC=0
+# ── Host detection ──────────────────────────────────────────────────────────
+IS_STEAMOS=0; IS_BAZZITE=0
 detect_distro() {
-	local osr="/etc/os-release"; [ -r "$osr" ] || osr="/usr/lib/os-release"
+	local osr="/etc/os-release"
+	[ -r "$osr" ] || osr="/usr/lib/os-release"
 	local idline=""
 	[ -r "$osr" ] && idline="$(tr 'A-Z' 'a-z' < "$osr")"
 	case "$idline" in *steamos*|*holo*) IS_STEAMOS=1 ;; esac
 	case "$idline" in *bazzite*) IS_BAZZITE=1 ;; esac
-	case "$idline" in *silverblue*|*kinoite*|*bazzite*) IS_ATOMIC=1 ;; esac
-	# rpm-ostree + immutable /usr is also "atomic"
-	if command -v rpm-ostree >/dev/null 2>&1 && [ "$(stat -c %m /usr 2>/dev/null)" = "/usr" ]; then
-		IS_ATOMIC=1
-	fi
-	# steamos-readonly tool is the most reliable SteamOS signal
 	command -v steamos-readonly >/dev/null 2>&1 && IS_STEAMOS=1
-
-	local label="generic Linux"
-	[ "$IS_ATOMIC" = 1 ]  && label="atomic/immutable (rpm-ostree)"
+	local label="Linux"
 	[ "$IS_BAZZITE" = 1 ] && label="Bazzite"
 	[ "$IS_STEAMOS" = 1 ] && label="SteamOS (Steam Deck)"
 	info "Detected host: ${C_B}${label}${C_RST}"
 }
 
-# ── Single sudo prompt + keepalive ──────────────────────────────────────────
-SUDO_KEEPALIVE_PID=""
-prime_sudo() {
-	title "Admin access (one password)"
-	info "Asking for your sudo password ONCE. It is cached for the rest of the install."
-	if ! sudo -v; then die "sudo authentication failed."; fi
-	# Refresh the cached credential in the background so the big download
-	# never lets the 5-minute sudo timeout lapse mid-install.
-	( while true; do sudo -n true 2>/dev/null; sleep 50; kill -0 "$$" 2>/dev/null || exit 0; done ) &
-	SUDO_KEEPALIVE_PID=$!
-	ok "sudo ready (cached)."
-}
-cleanup() { [ -n "$SUDO_KEEPALIVE_PID" ] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true; }
-trap cleanup EXIT INT TERM
-
-# ── SteamOS read-only rootfs helpers (no-op off SteamOS) ────────────────────
-RO_TOGGLED=0
-usr_writable() {
-	# Same logic as install.sh probe_usr_writable — non-root EACCES != ro rootfs.
-	if [ "$(id -u)" = "0" ]; then
-		local p="/usr/bin/.valveoff-rw-$$"
-		if ( : > "$p" ) 2>/dev/null; then rm -f "$p" 2>/dev/null; return 0; fi
-		return 1
-	fi
-	sudo test -w /usr/bin 2>/dev/null && return 0
-	command -v steamos-readonly >/dev/null 2>&1 \
-		&& steamos-readonly status 2>/dev/null | grep -qiE 'disabled|off' && return 0
-	return 1
-}
-unlock_rootfs() {
-	command -v steamos-readonly >/dev/null 2>&1 || return 0
-	usr_writable && return 0
-	info "Disabling SteamOS read-only filesystem (sudo)…"
-	if sudo steamos-readonly disable 2>/dev/null; then
-		if usr_writable; then
-			RO_TOGGLED=1; ok "/usr is writable (via sudo / steamos-readonly disabled)."
-		else
-			warn "steamos-readonly disable ran but /usr still looks locked."
-		fi
-	else
-		warn "Could not disable steamos-readonly — Game-Mode steps may fail."
-	fi
-}
-relock_rootfs() {
-	[ "$RO_TOGGLED" = 1 ] || return 0
-	sudo steamos-readonly enable 2>/dev/null && ok "Re-enabled SteamOS read-only (safe default)." || \
-		warn "Could not re-enable readonly — run: sudo steamos-readonly enable"
-	RO_TOGGLED=0
-}
-
-# ── Stop Steam so file patches apply cleanly ────────────────────────────────
-stop_steam() {
-	if pgrep -x steam >/dev/null 2>&1 || pgrep -x steamwebhelper >/dev/null 2>&1; then
-		info "Closing Steam so changes apply cleanly…"
-		pkill -TERM steam steamwebhelper 2>/dev/null || true
-		sleep 2
-		pkill -KILL steam steamwebhelper 2>/dev/null || true
-	fi
-}
-
-# ═════════════════════════════════════════════════════════════════════════════
-#  SMART CLEANUP — previous OneTap / SLSsteam installation
-# ═════════════════════════════════════════════════════════════════════════════
-SLS_DIR="$HOME_DIR/.local/share/SLSsteam"
-SLS_CFG_DIR="$HOME_DIR/.config/SLSsteam"
-APPS_DIR="$HOME_DIR/.local/share/applications"
-
-onetap_present() {
-	[ -d "$SLS_DIR" ] && return 0
-	[ -d "$SLS_CFG_DIR" ] && return 0
-	[ -f "$APPS_DIR/steam-onetap.desktop" ] && return 0
-	# any patched steam binary referencing SLSsteam
-	for b in /usr/bin/steam-jupiter /usr/bin/steam /usr/local/bin/steam; do
-		[ -f "$b" ] && grep -q "SLSsteam" "$b" 2>/dev/null && return 0
-	done
-	# any steam.cfg that inhibits updates
-	for c in \
-		"$HOME_DIR/.steam/steam/steam.cfg" \
-		"$HOME_DIR/.steam/root/steam.cfg" \
-		"$HOME_DIR/.local/share/Steam/steam.cfg"; do
-		[ -f "$c" ] && grep -qi "BootStrapper" "$c" 2>/dev/null && return 0
-	done
-	return 1
-}
-
-# Remove OneTap's Desktop-Mode unlock (.desktop entries + LD_AUDIT wrappers).
-onetap_remove_desktop_unlock() {
-	rm -f "$APPS_DIR/steam-onetap.desktop" 2>/dev/null && ok "Removed steam-onetap.desktop"
-	# OneTap PATH wrappers live under SLSsteam/path/
-	if [ -d "$SLS_DIR/path" ]; then
-		rm -rf "$SLS_DIR/path" 2>/dev/null && ok "Removed SLSsteam PATH wrappers"
-	fi
-	# .desktop overrides patched by OneTap (reference SLSsteam). Our installer
-	# will recreate clean Hammer versions afterwards.
-	for d in steam.desktop steam-native.desktop; do
-		if [ -f "$APPS_DIR/$d" ] && grep -q "SLSsteam" "$APPS_DIR/$d" 2>/dev/null; then
-			rm -f "$APPS_DIR/$d" && ok "Removed OneTap-patched $d"
-		fi
-	done
-	# OneTap shell PATH snippet (fish)
-	rm -f "$HOME_DIR/.config/fish/conf.d/SLSsteam.fish" 2>/dev/null || true
-}
-
-# Strip OneTap's LD_AUDIT (SLSsteam) lines from a steam launcher binary.
-_strip_sls_ld_audit() {
-	local bin="$1"
-	[ -f "$bin" ] || return 0
-	grep -q "SLSsteam" "$bin" 2>/dev/null || return 0
-	local tmp; tmp="$(mktemp)"
-	# Drop any line that sets LD_AUDIT to an SLSsteam path (with or without export).
-	grep -vE '^[[:space:]]*(export[[:space:]]+)?LD_AUDIT=.*SLSsteam' "$bin" > "$tmp" 2>/dev/null
-	if sudo install -m 0755 "$tmp" "$bin" 2>/dev/null; then
-		ok "Stripped OneTap LD_AUDIT from $bin"
-	else
-		warn "Could not edit $bin (permission) — skipping."
-	fi
-	rm -f "$tmp"
-}
-
-# Remove OneTap's Game-Mode unlock (steam-jupiter / steam).
-onetap_remove_gamemode_unlock() {
-	unlock_rootfs
-	# Prefer restoring OneTap's own backup if it exists.
-	local bak="$SLS_DIR/steam-jupiter.bak"
-	if [ -f "$bak" ]; then
-		local tgt; tgt="$(command -v steam-jupiter 2>/dev/null || echo /usr/bin/steam-jupiter)"
-		if [ -f "$tgt" ] && sudo install -m 0755 "$bak" "$tgt" 2>/dev/null; then
-			ok "Restored $tgt from OneTap backup"
-		fi
-	fi
-	for b in /usr/bin/steam-jupiter /usr/bin/steam /usr/local/bin/steam; do
-		_strip_sls_ld_audit "$b"
+# ── Steam library discovery ───────────────────────────────────────────────────
+# Prints candidate Steam roots (one per line).
+steam_root_candidates() {
+	local r
+	for r in \
+		"$HOME/.local/share/Steam" \
+		"$HOME/.var/app/com.valvesoftware.Steam/data/Steam" \
+		; do
+		[ -d "$r/steamapps" ] && echo "$r"
 	done
 }
 
-# Remove steam.cfg so Steam can auto-update again.
-onetap_remove_steam_cfg() {
-	local removed=0
-	for c in \
-		"$HOME_DIR/.steam/steam/steam.cfg" \
-		"$HOME_DIR/.steam/root/steam.cfg" \
-		"$HOME_DIR/.local/share/Steam/steam.cfg" \
-		"$HOME_DIR/.var/app/com.valvesoftware.Steam/.local/share/Steam/steam.cfg"; do
-		if [ -f "$c" ]; then
-			rm -f "$c" && { ok "Removed $c (Steam auto-update re-enabled)"; removed=1; }
-		fi
-	done
-	[ "$removed" = 0 ] && info "No steam.cfg found — Steam updates already enabled."
+# Read installdir from appmanifest if present.
+manifest_installdir() {
+	local manifest="$1"
+	[ -f "$manifest" ] || return 1
+	grep -E '^\s*"installdir"' "$manifest" 2>/dev/null \
+		| head -1 \
+		| sed -E 's/.*"installdir"[[:space:]]+"([^"]+)".*/\1/'
 }
 
-onetap_remove_data() {
-	[ -d "$SLS_DIR" ]     && rm -rf "$SLS_DIR"     && ok "Removed $SLS_DIR"
-	[ -d "$SLS_CFG_DIR" ] && rm -rf "$SLS_CFG_DIR" && ok "Removed $SLS_CFG_DIR"
-	rm -f "$HOME_DIR/.SLSsteam.log" 2>/dev/null || true
-}
-
-smart_cleanup() {
-	title "Smart cleanup — previous OneTap install"
-	if ! onetap_present; then
-		ok "No previous OneTap / SLSsteam install detected — clean machine."
-		return 0
-	fi
-	warn "Existing OneTap / SLSsteam install found — removing it first."
-	stop_steam
-	onetap_remove_gamemode_unlock
-	onetap_remove_desktop_unlock
-	onetap_remove_steam_cfg
-	onetap_remove_data
-	ok "OneTap fully removed. Steam updates re-enabled."
-}
-
-# ═════════════════════════════════════════════════════════════════════════════
-#  DOWNLOAD BUNDLE → Downloads/
-# ═════════════════════════════════════════════════════════════════════════════
-download_bundle() {
-	title "Download ValveOFF bundle → $DEST"
-	local tmp="$DL_DIR/.$BUNDLE_FILE.part"
-	rm -f "$tmp" 2>/dev/null || true
-	info "This is a large download (~140 MB) — please wait."
-
-	if [ -n "$BUNDLE_URL" ]; then
-		# Self-hosted single-file override.
-		info "Source: $BUNDLE_URL"
-		if ! curl -fL --retry 3 --retry-delay 2 -o "$tmp" "$BUNDLE_URL"; then
-			die "Download failed. Check your internet / the bundle URL and try again."
-		fi
-	else
-		# Default: reassemble split raw parts from the configured branch (main).
-		info "Source: $BUNDLE_RAW_BASE (parts: $BUNDLE_PARTS)"
-		: > "$tmp" || die "Cannot write to $tmp"
-		local part url
-		for part in $BUNDLE_PARTS; do
-			url="$BUNDLE_RAW_BASE/$BUNDLE_FILE.$part.part"
-			info "  fetching part $part …"
-			if ! curl -fL --retry 3 --retry-delay 2 "$url" >> "$tmp"; then
-				rm -f "$tmp"
-				die "Download failed for part $part ($url). Re-run to retry."
-			fi
+# Collect library folder paths from libraryfolders.vdf (Steam + extra drives).
+library_paths_for_root() {
+	local root="$1"
+	local vdf="$root/steamapps/libraryfolders.vdf"
+	echo "$root"
+	[ -f "$vdf" ] || return 0
+	grep -E '^\s*"path"' "$vdf" 2>/dev/null \
+		| sed -E 's/.*"path"[[:space:]]+"([^"]+)".*/\1/' \
+		| while IFS= read -r p; do
+			[ -n "$p" ] && [ -d "$p/steamapps" ] && echo "$p"
 		done
+}
 
-		# Verify checksum against the embedded hash (authoritative). Remote
-		# .sha256 on GitHub raw can lag behind `main` for several minutes.
-		if [ -n "$BUNDLE_SHA256" ] && command -v sha256sum >/dev/null 2>&1; then
-			local got
-			got="$(sha256sum "$tmp" | awk '{print $1}')"
-			if [ "$BUNDLE_SHA256" != "$got" ]; then
-				rm -f "$tmp"
-				die "Checksum mismatch (expected $BUNDLE_SHA256, got $got) — corrupt download. Re-run to retry."
-			fi
-			ok "Checksum verified."
+# Find existing Crimson Desert installdir. Sets FOUND_GAME_DIR or dies.
+FOUND_GAME_DIR=""
+FOUND_STEAM_ROOT=""
+find_crimson_installdir() {
+	local root libdir installdir candidate manifest
+	local -a hits=()
 
-			# Best-effort: warn if the branch's published .sha256 file is stale.
-			local remote_want
-			remote_want="$(curl -fsSL "$BUNDLE_RAW_BASE/$BUNDLE_FILE.sha256?t=$(date +%s)" 2>/dev/null \
-				| awk '{print $1}' | head -1 || true)"
-			if [ -n "$remote_want" ] && [ "$remote_want" != "$got" ]; then
-				warn "Remote $BUNDLE_FILE.sha256 on GitHub is stale (CDN); embedded checksum used."
+	title "Locate Crimson Desert installdir"
+	local roots
+	roots="$(steam_root_candidates)"
+	[ -n "$roots" ] || die "Steam not found. Install Steam and add Crimson Desert to your library first."
+
+	while IFS= read -r root; do
+		[ -n "$root" ] || continue
+		info "Scanning Steam root: $root"
+		while IFS= read -r libdir; do
+			[ -n "$libdir" ] || continue
+			manifest="$libdir/steamapps/appmanifest_${STEAM_APP_ID}.acf"
+			installdir="$DEFAULT_INSTALL_DIR"
+			if [ -f "$manifest" ]; then
+				local from_manifest
+				from_manifest="$(manifest_installdir "$manifest")"
+				[ -n "$from_manifest" ] && installdir="$from_manifest"
 			fi
-		fi
+			candidate="$libdir/steamapps/common/$installdir"
+			if [ -d "$candidate" ]; then
+				hits+=("$candidate|$root|$libdir")
+				info "  found: $candidate"
+			fi
+		done < <(library_paths_for_root "$root")
+	done <<< "$roots"
+
+	if [ "${#hits[@]}" -eq 0 ]; then
+		die "Crimson Desert folder not found.
+
+Expected: steamapps/common/${DEFAULT_INSTALL_DIR}
+(in any Steam library — check Settings → Storage)
+
+Fix:
+  1. In Steam, select Crimson Desert → Install (choose location), then cancel
+     after the empty folder is created, OR
+  2. Manually: mkdir -p \"~/.local/share/Steam/steamapps/common/${DEFAULT_INSTALL_DIR}\"
+
+Re-run this script after the folder exists."
 	fi
 
-	info "Extracting…"
-	rm -rf "$DEST" 2>/dev/null || true
-	if ! tar -xzf "$tmp" -C "$DL_DIR"; then
-		rm -f "$tmp"
-		die "Extraction failed (corrupt download?). Re-run to retry."
+	if [ "${#hits[@]}" -gt 1 ]; then
+		warn "Multiple Crimson Desert folders found — using the first match."
 	fi
+
+	FOUND_GAME_DIR="${hits[0]%%|*}"
+	FOUND_STEAM_ROOT="${hits[0]#*|}"; FOUND_STEAM_ROOT="${FOUND_STEAM_ROOT%%|*}"
+	ok "Target installdir: ${C_B}${FOUND_GAME_DIR}${C_RST}"
+}
+
+# ── Download archive ──────────────────────────────────────────────────────────
+download_archive() {
+	local dl_dir tmp part url got want
+	dl_dir="$(resolve_downloads_dir)"
+	tmp="$dl_dir/.${ARCHIVE_FILE}.download"
 	rm -f "$tmp"
-	[ -f "$DEST/install.sh" ] || die "Bundle extracted but install.sh not found at $DEST — bundle layout unexpected."
-	chmod +x "$DEST/install.sh" 2>/dev/null || true
-	ok "Bundle ready at: $DEST"
-}
+	: > "$tmp"
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  DECKY LOADER (latest)
-# ═════════════════════════════════════════════════════════════════════════════
-decky_installed() {
-	# Require the actual PluginLoader binary. A leftover ~/homebrew/services/
-	# directory from an old/partial install must NOT skip a fresh Decky install.
-	[ -x "$HOME_DIR/homebrew/services/PluginLoader" ] && return 0
-	return 1
-}
-install_decky() {
-	title "Decky Loader (latest)"
-	if [ "${FORCE_DECKY:-0}" != "1" ] && decky_installed; then
-		ok "Decky Loader already installed — skipping."
-		info "  To force reinstall/upgrade: FORCE_DECKY=1 curl .../install | bash"
-		return 0
+	title "Download ${ARCHIVE_FILE}"
+	if [ -n "$ARCHIVE_URL" ]; then
+		info "Source: $ARCHIVE_URL"
+		curl -fL --retry 3 --retry-delay 2 --progress-bar -o "$tmp" "$ARCHIVE_URL" \
+			|| die "Download failed: $ARCHIVE_URL"
+	else
+		info "Source: $RAW_BASE (parts: $ARCHIVE_PARTS)"
+		for part in $ARCHIVE_PARTS; do
+			url="$RAW_BASE/${ARCHIVE_FILE}.${part}.part"
+			info "  fetching part $part …"
+			curl -fL --retry 3 --retry-delay 2 "$url" >> "$tmp" \
+				|| die "Download failed for part $part ($url)"
+		done
 	fi
-	info "Installing Decky Loader (official release installer)…"
-	if curl -fsSL "https://github.com/SteamDeckHomebrew/decky-installer/releases/latest/download/install_release.sh" | sh; then
-		ok "Decky Loader installed."
-		if [ -x "$HOME_DIR/homebrew/services/PluginLoader" ]; then
-			sudo systemctl restart plugin_loader 2>/dev/null \
-				&& ok "Restarted plugin_loader." \
-				|| warn "Restart plugin_loader manually: sudo systemctl restart plugin_loader"
-		else
-			warn "PluginLoader binary not found after install — check Decky installer output."
+
+	if [ -n "$ARCHIVE_SHA256" ] && command -v sha256sum >/dev/null 2>&1; then
+		got="$(sha256sum "$tmp" | awk '{print $1}')"
+		if [ "$ARCHIVE_SHA256" != "$got" ]; then
+			rm -f "$tmp"
+			die "Checksum mismatch (expected $ARCHIVE_SHA256, got $got)."
 		fi
-	else
-		warn "Decky Loader install returned an error."
-		warn "  hammer-decky may not load in Game Mode until Decky is installed."
-		warn "  Retry manually:"
-		warn "    curl -fsSL https://github.com/SteamDeckHomebrew/decky-installer/releases/latest/download/install_release.sh | sh"
+		ok "SHA256 verified."
 	fi
+
+	ARCHIVE_PATH="$tmp"
+	ok "Downloaded $(du -h "$tmp" | awk '{print $1}') → $tmp"
 }
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  HAMMER + VALVEOFF + HAMMER-DECKY (via bundle install.sh) + GAME-MODE UNLOCK
-# ═════════════════════════════════════════════════════════════════════════════
-install_core() {
-	title "Install Hammer + ValveOFF + hammer-decky + Desktop unlock"
-	# install.sh resolves its own paths; run from the bundle dir.
-	( cd "$DEST" && bash ./install.sh install ) \
-		|| warn "Core install reported a non-zero exit — see messages above."
+# ── Extract ───────────────────────────────────────────────────────────────────
+extract_to_installdir() {
+	local seven_zip pct
+	seven_zip="$(resolve_7z)"
+	title "Extract → ${FOUND_GAME_DIR}"
+	info "Using $seven_zip (files land under bin64/ inside installdir)"
+
+	if ! "$seven_zip" x -o"$FOUND_GAME_DIR" -y "$ARCHIVE_PATH"; then
+		die "Extraction failed."
+	fi
+
+	# Sanity check: main executable must exist after extract.
+	if [ ! -f "$FOUND_GAME_DIR/bin64/CrimsonDesert.exe" ]; then
+		die "Extract finished but bin64/CrimsonDesert.exe is missing — archive may be corrupt."
+	fi
+
+	ok "Extract complete."
+	ok "Executable: $FOUND_GAME_DIR/bin64/CrimsonDesert.exe"
 }
 
-# Always pull hammersteam.so + library-inject.so from main/bin after the bundle
-# install. The tarball can lag behind `bin/` (observed: bundle-linux shipped 1.1.6
-# while main/bin had a newer build). Keeps existing config.yaml.
-refresh_hammer_binaries() {
-	title "Refresh Hammer binaries (main/bin — latest hammersteam.so)"
-	local hammer_dir="$HOME_DIR/.local/share/Hammer"
-	local tmp
-	tmp="$(mktemp -d "${TMPDIR:-/tmp}/valveoff-hammer.XXXXXX")"
+# ── Optional: ensure appmanifest so Steam shows PLAY ─────────────────────────
+ensure_appmanifest() {
+	local libdir manifest now size
+	libdir="$(dirname "$(dirname "$FOUND_GAME_DIR")")"
+	manifest="$libdir/steamapps/appmanifest_${STEAM_APP_ID}.acf"
+	[ -f "$manifest" ] && { ok "appmanifest already present."; return 0; }
 
-	mkdir -p "$hammer_dir"
-	info "Downloading hammersteam.so + library-inject.so from $MAIN_RAW_BASE/bin/ …"
+	now="$(date +%s)"
+	size="$(du -sb "$FOUND_GAME_DIR" 2>/dev/null | awk '{print $1}')"
+	[ -z "$size" ] && size="0"
 
-	if ! curl -fsSL --retry 3 --retry-delay 2 \
-		-o "$tmp/hammersteam.so" "$MAIN_RAW_BASE/bin/hammersteam.so"; then
-		rm -rf "$tmp"
-		warn "Could not download hammersteam.so — bundle copy left in place."
-		warn "  Run later: curl -fsSL $MAIN_RAW_BASE/update-hammer.sh | bash"
-		return 1
-	fi
-	if ! curl -fsSL --retry 3 --retry-delay 2 \
-		-o "$tmp/library-inject.so" "$MAIN_RAW_BASE/bin/library-inject.so"; then
-		rm -rf "$tmp"
-		warn "Could not download library-inject.so — bundle copy left in place."
-		return 1
-	fi
-
-	[[ "$(wc -c < "$tmp/hammersteam.so")" -gt 1000000 ]] \
-		|| { rm -rf "$tmp"; warn "hammersteam.so too small — skipping refresh."; return 1; }
-
-	cp -f "$tmp/hammersteam.so"   "$hammer_dir/hammersteam.so"
-	cp -f "$tmp/library-inject.so" "$hammer_dir/library-inject.so"
-	chmod 0755 "$hammer_dir/hammersteam.so" "$hammer_dir/library-inject.so"
-	rm -rf "$tmp"
-
-	# Best-effort version stamp for the install log.
-	if strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "deck-exit-fix"; then
-		ok "Installed Hammer 1.1.9 (deck-exit-fix) → $hammer_dir/"
-	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.9"; then
-		ok "Installed Hammer 1.1.9 → $hammer_dir/"
-	else
-		ok "Installed latest hammersteam.so → $hammer_dir/"
-		warn "  Version stamp not recognized — check ~/.Hammer.log after restarting Steam."
-	fi
+	info "Writing appmanifest_${STEAM_APP_ID}.acf (PLAY button)…"
+	cat > "$manifest" <<EOF
+"AppState"
+{
+	"appid"		"${STEAM_APP_ID}"
+	"Universe"		"1"
+	"name"		"Crimson Desert"
+	"StateFlags"		"4"
+	"installdir"		"${DEFAULT_INSTALL_DIR}"
+	"lastupdated"		"${now}"
+	"LastPlayed"		"0"
+	"SizeOnDisk"		"${size}"
+	"StagingSize"		"0"
+	"buildid"		"24545272"
+	"LastOwner"		"0"
+	"DownloadType"		"1"
+	"UpdateResult"		"0"
+	"BytesToDownload"		"0"
+	"BytesDownloaded"		"0"
+	"BytesToStage"		"0"
+	"BytesStaged"		"0"
+	"TargetBuildID"		"24545272"
+	"AutoUpdateBehavior"		"0"
+	"AllowOtherDownloadsWhileRunning"		"0"
+	"ScheduledAutoUpdate"		"0"
+	"InstalledDepots"
+	{
+		"3321461"
+		{
+			"manifest"		"233788525894670034"
+			"size"		"${size}"
+		}
+	}
+	"UserConfig"
+	{
+		"language"		"english"
+	}
+	"MountedConfig"
+	{
+		"language"		"english"
+	}
 }
-
-# Install hammer-decky from the extracted ValveOFF bundle (compiled dist only —
-# no source on this public repo). Re-run full install or update-hammer-decky.sh
-# to refresh the plugin from the release tarball.
-install_hammer_decky_from_bundle() {
-	title "hammer-decky (from ValveOFF bundle)"
-	local dst="$HOME_DIR/homebrew/plugins/hammer-decky"
-	local src="$DEST/hammer-decky"
-
-	if ! decky_installed; then
-		warn "Decky Loader not installed — skipping hammer-decky."
-		return 0
-	fi
-
-	if [ ! -d "$src" ] || [ ! -f "$src/dist/index.js" ]; then
-		warn "hammer-decky not found in bundle ($src) — skipping."
-		return 0
-	fi
-
-	if grep -q 'React\.createElement' "$src/dist/index.js" 2>/dev/null; then
-		warn "Bundle hammer-decky dist uses React.createElement — refusing broken build."
-		return 1
-	fi
-
-	info "Installing hammer-decky from bundle to $dst …"
-	if [ -d "$dst" ] && [ ! -w "$dst" ]; then
-		sudo rm -rf "$dst"
-		sudo mkdir -p "$dst"
-		sudo cp -a "$src/." "$dst/"
-		sudo chown -R "$USER_NAME:$(id -gn)" "$dst"
-	else
-		mkdir -p "$dst"
-		rm -rf "${dst:?}/"*
-		cp -a "$src/." "$dst/"
-	fi
-	chmod 0755 "$dst/main.py" 2>/dev/null || true
-
-	ok "hammer-decky installed from bundle."
-	if systemctl is-active plugin_loader >/dev/null 2>&1; then
-		sudo systemctl restart plugin_loader 2>/dev/null \
-			&& ok "Restarted plugin_loader." \
-			|| warn "Restart manually: sudo systemctl restart plugin_loader"
-	fi
-}
-
-apply_gamemode_unlock() {
-	title "Game-Mode unlock"
-	if [ "$IS_STEAMOS" = 1 ]; then
-		info "SteamOS → patching /usr/bin/steam-jupiter."
-		( cd "$DEST" && bash ./install.sh gamemode-install )
-	elif [ "$IS_ATOMIC" = 1 ] || [ "$IS_BAZZITE" = 1 ]; then
-		info "Bazzite/atomic → dropping /usr/local/bin/steam wrapper."
-		( cd "$DEST" && bash ./install.sh bazzite-install )
-	else
-		warn "Generic Linux: no Game-Mode patch applied (Desktop-Mode unlock is active)."
-		info "  For Flatpak Steam, run later:  cd \"$DEST\" && ./install.sh flatpak-install"
-	fi
-}
-
-# ═════════════════════════════════════════════════════════════════════════════
-#  MAIN
-# ═════════════════════════════════════════════════════════════════════════════
-main() {
-	title "ValveOFF one-paste installer"
-	info "User: $USER_NAME    Home: $HOME_DIR"
-	info "Downloads: $DL_DIR"
-	detect_distro
-	prime_sudo
-
-	smart_cleanup
-	stop_steam
-	download_bundle
-	install_decky
-	install_core
-	refresh_hammer_binaries || true
-	install_hammer_decky_from_bundle
-	apply_gamemode_unlock
-	relock_rootfs
-
-	title "${C_B}DONE${C_RST}"
-	cat <<EOF
-
-  ValveOFF is installed. Final manual step (one time):
-
-  ${C_B}1.${C_RST} Launch Steam in Desktop Mode (let it update if it wants — that's fine).
-  ${C_B}2.${C_RST} Run ValveOFF once to activate your license:
-         "$DEST/ValveOFF"
-       (or from the KDE menu) — this writes the device-bound activation
-       that hammer-decky needs for Game Mode.
-  ${C_B}3.${C_RST} Switch to Game Mode → quick-access menu (•••) → Hammer Library.
-
-  Bundle / re-run / uninstall:
-       cd "$DEST"
-       ./install.sh status       # what's installed
-       ./install.sh verify       # did Hammer load in Desktop Mode?
-       ./install.sh uninstall    # remove everything (keeps config)
-
-  Salamat! Enjoy ValveOFF.
 EOF
+	ok "Created $manifest — restart Steam to see PLAY."
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+main() {
+	title "Crimson Desert bin64 pack"
+	detect_distro
+	find_crimson_installdir
+	download_archive
+	extract_to_installdir
+	ensure_appmanifest
+	rm -f "$ARCHIVE_PATH" 2>/dev/null || true
+
+	title "Done"
+	ok "Crimson Desert bin64 files installed."
+	info "Restart Steam, enable Proton for AppID ${STEAM_APP_ID}, then PLAY."
 }
 
 main "$@"
