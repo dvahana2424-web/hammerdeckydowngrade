@@ -1,10 +1,10 @@
 <#
     Hammer 4.1 (obfuscated) - One-paste installer
     Usage (run in PowerShell) — same branch URL as 3.8 for backward compatibility:
-        irm 'https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-obfuscated/install.ps1?rev=4.1.2' | iex
+        irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-obfuscated/install.ps1 | iex
 
     jsDelivr alternate:
-        irm 'https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@Hammer-3.8-obfuscated/install.ps1?rev=4.1.2' | iex
+        irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@Hammer-3.8-obfuscated/install.ps1 | iex
 
     Downloads Hammer 4.1 payload from Cloudflare CDN (hammer-cdn worker),
     installs to C:\Program Files (x86)\Hammer, Desktop shortcut, and
@@ -21,8 +21,8 @@ $BranchUrl = [uri]::EscapeDataString($Branch)
 $Repo = 'dvahana2424-web/hammerdeckydowngrade'
 $InstallRev = '4.1.2'
 $InstallUrls = @(
-    "https://raw.githubusercontent.com/$Repo/$BranchUrl/install.ps1?rev=$InstallRev",
-    "https://cdn.jsdelivr.net/gh/$Repo@$Branch/install.ps1?rev=$InstallRev"
+    "https://raw.githubusercontent.com/$Repo/$BranchUrl/install.ps1",
+    "https://cdn.jsdelivr.net/gh/$Repo@$Branch/install.ps1"
 )
 $InstallUrl = $InstallUrls[0]
 $CdnBase = 'https://hammer-cdn.monzikmonzik.workers.dev'
@@ -47,11 +47,14 @@ if (-not $isAdmin) {
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;
 `$urls=@($urlList);
 `$ok=`$false;
+`$cb=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds();
 foreach(`$u in `$urls){
-  try { Invoke-RestMethod -Uri `$u -Headers @{'Cache-Control'='no-cache'} | Invoke-Expression; `$ok=`$true; break }
-  catch { Write-Host "  fetch failed: `$u" -ForegroundColor DarkYellow }
+  try {
+    Invoke-RestMethod -Uri "`$u`?_=`$cb" -Headers @{'Cache-Control'='no-cache'} | Invoke-Expression;
+    `$ok=`$true; break
+  } catch { Write-Host "  fetch failed: `$u" -ForegroundColor DarkYellow }
 }
-if(-not `$ok){ throw 'Could not download install script. Run: irm ...install.ps1?rev=$InstallRev | iex' }
+if(-not `$ok){ throw 'Could not download install script. Check your internet connection and try again.' }
 "@
     $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cmd))
     try {
