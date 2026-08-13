@@ -7,7 +7,7 @@
   powershell -ExecutionPolicy Bypass -File .\installer\package-payload.ps1
 
 .OUTPUT
-  installer\payload-out\Hammer-4.1.zip.001, .002, ...
+  installer\payload-out\Hammer-4.1.2.zip  (single file when under 100 MB)
 #>
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression
@@ -17,8 +17,9 @@ $Root = Split-Path $PSScriptRoot -Parent
 $PublishDir = Join-Path $Root 'publish\Hammer3.9-obfuscated'
 $FallbackDir = 'C:\Program Files (x86)\Hammer'
 $OutDir = Join-Path $PSScriptRoot 'payload-out'
-$ZipName = 'Hammer-4.1.1.zip'
+$ZipName = 'Hammer-4.1.2.zip'
 $PartSizeBytes = 90MB
+$MaxSingleFileBytes = 100MB
 
 $IncludeFiles = @('Hammer.exe', 'hammer.ico')
 $OffmodeFiles = @('dlhost.exe')
@@ -81,37 +82,42 @@ Write-Host 'Creating zip ...' -ForegroundColor Cyan
 $zipLen = (Get-Item -LiteralPath $zipPath).Length
 Write-Host "Zip size: $([math]::Round($zipLen / 1MB, 1)) MB" -ForegroundColor Green
 
-Get-ChildItem $OutDir -Filter 'Hammer-4.1*.zip.*' -ErrorAction SilentlyContinue | Remove-Item -Force
+Get-ChildItem $OutDir -Filter 'Hammer-4.1*.zip*' -ErrorAction SilentlyContinue | Remove-Item -Force
 
-$partNum = 1
-$fs = [System.IO.File]::Open($zipPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
-try {
-    $buf = New-Object byte[] (4MB)
-    while ($fs.Position -lt $fs.Length) {
-        $partPath = Join-Path $OutDir ("{0}.{1:D3}" -f $ZipName, $partNum)
-        $out = [System.IO.File]::Create($partPath)
-        try {
-            $written = [int64]0
-            while ($written -lt $PartSizeBytes -and $fs.Position -lt $fs.Length) {
-                $toRead = [Math]::Min($buf.Length, [int]($PartSizeBytes - $written))
-                if ($toRead -gt ($fs.Length - $fs.Position)) { $toRead = [int]($fs.Length - $fs.Position) }
-                $n = $fs.Read($buf, 0, $toRead)
-                if ($n -le 0) { break }
-                $out.Write($buf, 0, $n)
-                $written += $n
-            }
-        } finally { $out.Close() }
-        $plen = (Get-Item $partPath).Length
-        Write-Host "  part $partNum : $([math]::Round($plen / 1MB, 1)) MB" -ForegroundColor DarkGray
-        $partNum++
-    }
-} finally {
-    $fs.Close()
-    Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
-    Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
+if ($zipLen -le $MaxSingleFileBytes) {
+    $singlePath = Join-Path $OutDir $ZipName
+    Copy-Item -LiteralPath $zipPath -Destination $singlePath -Force
+    Write-Host "  single file: $([math]::Round($zipLen / 1MB, 1)) MB (no split)" -ForegroundColor DarkGray
+} else {
+    $partNum = 1
+    $fs = [System.IO.File]::Open($zipPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+    try {
+        $buf = New-Object byte[] (4MB)
+        while ($fs.Position -lt $fs.Length) {
+            $partPath = Join-Path $OutDir ("{0}.{1:D3}" -f $ZipName, $partNum)
+            $out = [System.IO.File]::Create($partPath)
+            try {
+                $written = [int64]0
+                while ($written -lt $PartSizeBytes -and $fs.Position -lt $fs.Length) {
+                    $toRead = [Math]::Min($buf.Length, [int]($PartSizeBytes - $written))
+                    if ($toRead -gt ($fs.Length - $fs.Position)) { $toRead = [int]($fs.Length - $fs.Position) }
+                    $n = $fs.Read($buf, 0, $toRead)
+                    if ($n -le 0) { break }
+                    $out.Write($buf, 0, $n)
+                    $written += $n
+                }
+            } finally { $out.Close() }
+            $plen = (Get-Item $partPath).Length
+            Write-Host "  part $partNum : $([math]::Round($plen / 1MB, 1)) MB" -ForegroundColor DarkGray
+            $partNum++
+        }
+    } finally { $fs.Close() }
 }
 
-$parts = Get-ChildItem $OutDir -Filter 'Hammer-4.1*.zip.*' | Sort-Object Name
+Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
+
+$parts = Get-ChildItem $OutDir -Filter 'Hammer-4.1*.zip*' | Sort-Object Name
 Write-Host "Created $($parts.Count) parts in $OutDir" -ForegroundColor Green
 $parts | ForEach-Object { Write-Host "  $($_.Name) ($([math]::Round($_.Length/1MB,1)) MB)" }
 Write-Host ''

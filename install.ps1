@@ -19,9 +19,10 @@ $ProgressPreference = 'Continue'
 $Branch = 'Hammer-3.8-obfuscated'
 $BranchUrl = [uri]::EscapeDataString($Branch)
 $Repo = 'dvahana2424-web/hammerdeckydowngrade'
+$InstallRev = '4.1.2'
 $InstallUrls = @(
-    "https://raw.githubusercontent.com/$Repo/$BranchUrl/install.ps1",
-    "https://cdn.jsdelivr.net/gh/$Repo@$Branch/install.ps1"
+    "https://raw.githubusercontent.com/$Repo/$BranchUrl/install.ps1?rev=$InstallRev",
+    "https://cdn.jsdelivr.net/gh/$Repo@$Branch/install.ps1?rev=$InstallRev"
 )
 $InstallUrl = $InstallUrls[0]
 $CdnBase = 'https://hammer-cdn.monzikmonzik.workers.dev'
@@ -29,8 +30,11 @@ $InstallDir = 'C:\Program Files (x86)\Hammer'
 $AppName = 'Hammer 4.1'
 $Version = '4.1-obfuscated'
 $Publisher = 'Hammer'
-$ZipName = 'Hammer-4.1.1.zip'
-$Parts = @('Hammer-4.1.1.zip.001', 'Hammer-4.1.1.zip.002')
+$ZipName = 'Hammer-4.1.2.zip'
+$Parts = @('Hammer-4.1.2.zip')
+$ExpectedPartBytes = @{
+    'Hammer-4.1.2.zip' = 104784748
+}
 
 # ---- Self-elevate to Administrator --------------------------------------
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
@@ -38,7 +42,17 @@ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
 
 if (-not $isAdmin) {
     Write-Host 'Requesting administrator rights...' -ForegroundColor Yellow
-    $cmd = "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; irm $InstallUrl | iex"
+    $urlList = ($InstallUrls | ForEach-Object { "'$_'" }) -join ','
+    $cmd = @"
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;
+`$urls=@($urlList);
+`$ok=`$false;
+foreach(`$u in `$urls){
+  try { Invoke-RestMethod -Uri `$u -Headers @{'Cache-Control'='no-cache'} | Invoke-Expression; `$ok=`$true; break }
+  catch { Write-Host "  fetch failed: `$u" -ForegroundColor DarkYellow }
+}
+if(-not `$ok){ throw 'Could not download install script. Run: irm ...install.ps1?rev=$InstallRev | iex' }
+"@
     $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cmd))
     try {
         Start-Process powershell.exe -Verb RunAs -ArgumentList @(
@@ -52,6 +66,7 @@ if (-not $isAdmin) {
 
 Write-Host '==============================================' -ForegroundColor Cyan
 Write-Host " Installing $AppName (obfuscated)" -ForegroundColor Cyan
+Write-Host " Installer script: $InstallRev (single-file payload)" -ForegroundColor Cyan
 Write-Host ' Source: Cloudflare CDN' -ForegroundColor Cyan
 Write-Host '==============================================' -ForegroundColor Cyan
 
@@ -67,7 +82,8 @@ function Format-Span([double]$seconds) {
 }
 
 function Get-PartUrls([string]$name) {
-    @("$CdnBase/v1/public/installer/$name")
+    $cb = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    @("$CdnBase/v1/public/installer/$name?cb=$cb")
 }
 
 function Get-FileCurl([string]$url, [string]$dest, [string]$label) {
@@ -169,35 +185,46 @@ Write-Host 'Hammer uninstalled.' -ForegroundColor Green
 }
 
 try {
-    Write-Host "Downloading payload ($($Parts.Count) parts) from CDN..." -ForegroundColor Green
+    Write-Host "Downloading payload ($($Parts.Count) file(s)) from CDN..." -ForegroundColor Green
     $partFiles = @()
     $i = 0
     foreach ($p in $Parts) {
         $i++
         $dest = Join-Path $work $p
-        $label = "Downloading $AppName - part $i of $($Parts.Count) ($p)"
+        $label = "Downloading $AppName - file $i of $($Parts.Count) ($p)"
         Write-Host ("  [{0}/{1}] {2}" -f $i, $Parts.Count, $p)
         Get-File (Get-PartUrls $p) $dest $label
+        $got = (Get-Item -LiteralPath $dest).Length
+        Write-Host ("  downloaded {0:N0} bytes" -f $got) -ForegroundColor DarkGray
+        $expected = $ExpectedPartBytes[$p]
+        if ($expected -gt 0 -and $got -ne $expected) {
+            throw "Wrong size for $p (got $got, expected $expected). Stale CDN cache — wait 1 min and retry."
+        }
         $partFiles += $dest
     }
 
-    Write-Host 'Reassembling package...' -ForegroundColor Green
-    $out = [System.IO.File]::Create($zipPath)
-    try {
-        foreach ($pf in $partFiles) {
-            $in = [System.IO.File]::OpenRead($pf)
-            try { $in.CopyTo($out) } finally { $in.Close() }
-        }
-    } finally { $out.Close() }
+    if ($Parts.Count -eq 1) {
+        $zipPath = $partFiles[0]
+        Write-Host 'Package ready (single file, no reassembly).' -ForegroundColor Green
+    } else {
+        Write-Host 'Reassembling package...' -ForegroundColor Green
+        $out = [System.IO.File]::Create($zipPath)
+        try {
+            foreach ($pf in $partFiles) {
+                $in = [System.IO.File]::OpenRead($pf)
+                try { $in.CopyTo($out) } finally { $in.Close() }
+            }
+        } finally { $out.Close() }
+    }
 
     $zipLen = (Get-Item -LiteralPath $zipPath).Length
     Write-Host "Package size: $([math]::Round($zipLen/1MB,1)) MB" -ForegroundColor DarkGray
-  try {
+    try {
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         $testZip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
         $testZip.Dispose()
     } catch {
-        throw "Downloaded package is corrupt (stale CDN cache or incomplete part). Delete temp and retry, or wait 2 minutes.`n$($_.Exception.Message)"
+        throw "Downloaded package is corrupt (stale CDN cache or incomplete download). Retry in 1 minute.`n$($_.Exception.Message)"
     }
 
     Get-Process -Name 'Hammer', 'SteamDbBridgeHost', 'packer' -ErrorAction SilentlyContinue |
