@@ -1,8 +1,8 @@
-﻿# Hammer 3.8 (obfuscated) — One-paste installer
+﻿# Hammer 3.9 (obfuscated) — One-paste installer
 
-Branch: [`Hammer-3.8-obfuscated`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/Hammer-3.8-obfuscated)
+Branch: [`Hammer-3.8-obfuscated`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/Hammer-3.8-obfuscated) *(URL unchanged for backward compatibility)*
 
-Based on `Hammer-3.8-fixed-connection`, with the **obfuscated** Hammer 3.8 build from `C:\Program Files (x86)\Hammer`.
+Installs **Hammer 3.9** (Cloudflare CDN, obfuscated build) from `C:\Program Files (x86)\Hammer`.
 
 Open **Windows PowerShell** (a UAC admin prompt will appear automatically) and paste:
 
@@ -16,26 +16,32 @@ jsDelivr alternate:
 irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@Hammer-3.8-obfuscated/install.ps1 | iex
 ```
 
-Payload mirrors: [GitHub Release v3.8-obfuscated](https://github.com/dvahana2424-web/hammerdeckydowngrade/releases/tag/v3.8-obfuscated) (primary) and this branch.
+Payload: [GitHub Release v3.9-obfuscated](https://github.com/dvahana2424-web/hammerdeckydowngrade/releases/tag/v3.9-obfuscated)
 
-## What's in this build
+## What's in Hammer 3.9
 
-- License / connection fix (ValveOFF-style)
-- UI layout lock (minimize works; no forced fullscreen)
-- Delete Game IDs: title filter, fixed first-row overlap, deletes unlock lua + auto Steam restart
-- Embedded `hammer.ico`
-- **Obfuscar** rename protection (self-contained, no separate .NET install)
+- Cloudflare CDN worker for game DB + sojorepo (no GitHub PAT in client for games)
+- Hammer 3.9 obfuscated self-contained build
+- Unlock Mode 3 fixes, session caching, CDN branch-check fix
+- All 3.8 UX fixes (minimize, delete filter, Steam restart on lua removal)
 
-Payload refreshed from `C:\Program Files (x86)\Hammer\Hammer.exe` (latest obfuscated build).
+Payload built from `C:\Program Files (x86)\Hammer` via `package-payload.ps1`.
 
-## What it does
+## What the installer does
 
 1. Requests Administrator rights (UAC).
-2. Downloads the payload (`Hammer-3.8.zip.001`, `Hammer-3.8.zip.002`) and reassembles it.
-3. Installs the files to `C:\Program Files (x86)\Hammer`.
-4. Creates a Desktop shortcut **"Hammer 3.8"** using `hammer.ico`.
-5. Registers an entry in **Control Panel > Programs and Features** that uninstalls via `Uninstall.exe`.
+2. Downloads `Hammer-3.9.zip.001` + `Hammer-3.9.zip.002` and reassembles the zip.
+3. Installs files to `C:\Program Files (x86)\Hammer`.
+4. Creates Desktop shortcut **"Hammer 3.9"**.
+5. Registers **Control Panel > Programs** uninstall via `Uninstall.exe`.
 
-## If you get HTTP 429
+## Maintainer: refresh payload
 
-The installer downloads payload files from the [v3.8-obfuscated release](https://github.com/dvahana2424-web/hammerdeckydowngrade/releases/tag/v3.8-obfuscated) first. If that fails, wait a few minutes and run the command again.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\package-payload.ps1
+# Upload payload-out\Hammer-3.9.zip.* to release v3.9-obfuscated
+```
+
+## HTTP 429
+
+Wait a few minutes and retry, or download manually from the [v3.9-obfuscated release](https://github.com/dvahana2424-web/hammerdeckydowngrade/releases/tag/v3.9-obfuscated).
