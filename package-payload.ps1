@@ -17,12 +17,17 @@ $Root = Split-Path $PSScriptRoot -Parent
 $PublishDir = Join-Path $Root 'publish\Hammer3.9-obfuscated'
 $FallbackDir = 'C:\Program Files (x86)\Hammer'
 $OutDir = Join-Path $PSScriptRoot 'payload-out'
-$ZipName = 'Hammer-4.1.2.zip'
+$ZipName = 'Hammer-4.1.3.zip'
 $PartSizeBytes = 90MB
 $MaxSingleFileBytes = 100MB
 
 $IncludeFiles = @('Hammer.exe', 'hammer.ico')
 $OffmodeFiles = @('dlhost.exe')
+$ApplistGamesUrl = 'https://raw.githubusercontent.com/H-Chris233/steamappidlist/master/data/games_appid.json'
+$ApplistFallbacks = @(
+    (Join-Path $FallbackDir 'steam_applist.json'),
+    'C:\Program Files (x86)\Hammerbkp4.0\steam_applist.json'
+)
 $DlhostFallbacks = @(
     'C:\Program Files (x86)\Hammerbkp4.0\offmode\dlhost.exe',
     'C:\Program Files (x86)\Hammer\offmode\dlhost.exe'
@@ -74,6 +79,53 @@ foreach ($name in $OffmodeFiles) {
     Copy-Item -LiteralPath $src -Destination (Join-Path $offmodeStaging $name) -Force
     $len = (Get-Item $src).Length
     Write-Host "  staged offmode\$name ($([math]::Round($len/1MB,1)) MB)" -ForegroundColor DarkGray
+}
+
+function Build-SteamApplistFromGames([string]$gamesJsonPath, [string]$destPath) {
+    Write-Host 'Building steam_applist.json (games-only, Steam v2 format) ...' -ForegroundColor Cyan
+    $games = Get-Content -LiteralPath $gamesJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $apps = foreach ($g in $games) {
+        if ($null -ne $g.appid -and -not [string]::IsNullOrWhiteSpace($g.name)) {
+            @{ appid = [int]$g.appid; name = [string]$g.name }
+        }
+    }
+    $wrapper = @{ applist = @{ apps = @($apps) } }
+    $json = $wrapper | ConvertTo-Json -Depth 5 -Compress
+    [System.IO.File]::WriteAllText($destPath, $json, [System.Text.UTF8Encoding]::new($false))
+    $count = @($apps).Count
+    $bytes = (Get-Item -LiteralPath $destPath).Length
+    Write-Host "  steam_applist.json: $count games, $([math]::Round($bytes / 1MB, 1)) MB" -ForegroundColor DarkGray
+}
+
+$applistDest = Join-Path $staging 'steam_applist.json'
+$applistReady = $false
+$applistTemp = Join-Path $env:TEMP ('hammer_games_appid_' + [Guid]::NewGuid().ToString('N') + '.json')
+try {
+    Write-Host 'Fetching games_appid.json for autocomplete ...' -ForegroundColor Cyan
+    curl.exe -fL -sS -o $applistTemp $ApplistGamesUrl
+    if ((Test-Path $applistTemp) -and ((Get-Item $applistTemp).Length -gt 0)) {
+        Build-SteamApplistFromGames $applistTemp $applistDest
+        $applistReady = $true
+    }
+} catch {
+    Write-Host "  fetch failed: $($_.Exception.Message)" -ForegroundColor DarkYellow
+} finally {
+    Remove-Item $applistTemp -Force -ErrorAction SilentlyContinue
+}
+
+if (-not $applistReady) {
+    foreach ($fb in $ApplistFallbacks) {
+        if (Test-Path $fb) {
+            Copy-Item -LiteralPath $fb -Destination $applistDest -Force
+            $applistReady = $true
+            Write-Host "  using fallback steam_applist: $fb" -ForegroundColor Yellow
+            break
+        }
+    }
+}
+
+if (-not $applistReady) {
+    throw 'steam_applist.json not available. Check internet or install Hammer with steam_applist.json present.'
 }
 
 $zipPath = Join-Path $env:TEMP ('hammer41_' + [Guid]::NewGuid().ToString('N') + '.zip')

@@ -15,10 +15,11 @@ $InstallDir = 'C:\Program Files (x86)\Hammer'
 $AppName = 'Hammer 4.1'
 $Version = '4.1'
 $Publisher = 'Hammer'
-$ZipName = 'Hammer-4.1.2.zip'
-$Parts = @('Hammer-4.1.2.zip')
+$ZipName = 'Hammer-4.1.3.zip'
+$Parts = @('Hammer-4.1.3.zip.001', 'Hammer-4.1.3.zip.002')
 $ExpectedPartBytes = @{
-    'Hammer-4.1.2.zip' = 104784748
+    'Hammer-4.1.3.zip.001' = 94371840
+    'Hammer-4.1.3.zip.002' = 12845062
 }
 
 Write-Host '==============================================' -ForegroundColor Cyan
@@ -210,8 +211,20 @@ try {
         $partFiles += $dest
     }
 
-    $zipPath = $partFiles[0]
-    Write-Host 'Package ready.' -ForegroundColor Green
+    if ($Parts.Count -eq 1) {
+        $zipPath = $partFiles[0]
+        Write-Host 'Package ready.' -ForegroundColor Green
+    } else {
+        Write-Host 'Reassembling package...' -ForegroundColor Green
+        $out = [System.IO.File]::Create($zipPath)
+        try {
+            foreach ($pf in $partFiles) {
+                $in = [System.IO.File]::OpenRead($pf)
+                try { $in.CopyTo($out) } finally { $in.Close() }
+            }
+        } finally { $out.Close() }
+        Write-Host 'Package ready.' -ForegroundColor Green
+    }
 
     $zipLen = (Get-Item -LiteralPath $zipPath).Length
     Write-Host "Package size: $([math]::Round($zipLen/1MB,1)) MB" -ForegroundColor DarkGray
