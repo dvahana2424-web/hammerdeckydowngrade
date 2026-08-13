@@ -37,6 +37,21 @@ function Format-Span([double]$seconds) {
     return ('{0:00}:{1:00}' -f $ts.Minutes, $ts.Seconds)
 }
 
+function Get-SourceLabel([string]$url) {
+    if ($url -like "$CdnBase*") { return 'Cloudflare CDN' }
+    return 'mirror'
+}
+
+# Keeps download endpoints out of anything shown to the user or written to the log.
+function Hide-Sources([string]$text) {
+    if ([string]::IsNullOrEmpty($text)) { return $text }
+    $out = $text -replace ([regex]::Escape($CdnBase) + '\S*'), 'Cloudflare CDN'
+    $out = $out -replace '(?i)\b[\w.-]*workers\.dev\S*', 'Cloudflare CDN'
+    $out = $out -replace '(?i)\b(raw\.githubusercontent\.com|cdn\.jsdelivr\.net|api\.github\.com|github\.com)\S*', 'mirror'
+    $out = $out -replace 'https?://\S+', 'mirror'
+    return $out
+}
+
 function Get-PartUrls([string]$name) {
     $cb = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     @(
@@ -122,8 +137,7 @@ function Get-File($urls, $dest, $label) {
 
     for ($try = 1; $try -le $maxTries; $try++) {
         foreach ($url in $urlList) {
-            $host_ = ([uri]$url).Host
-            Write-Host ('  source: {0}' -f $host_) -ForegroundColor DarkGray
+            Write-Host ('  source: {0}' -f (Get-SourceLabel $url)) -ForegroundColor DarkGray
 
             if (Test-Path $dest) { Remove-Item $dest -Force -ErrorAction SilentlyContinue }
 
@@ -175,7 +189,7 @@ Write-Host 'Hammer uninstalled.' -ForegroundColor Green
 }
 
 try {
-    Write-Host "Downloading payload ($($Parts.Count) file(s)) from CDN..." -ForegroundColor Green
+    Write-Host "Downloading payload ($($Parts.Count) file(s)) from Cloudflare CDN..." -ForegroundColor Green
     $partFiles = @()
     $i = 0
     foreach ($p in $Parts) {
@@ -274,16 +288,16 @@ try {
     Write-Host '==============================================' -ForegroundColor Green
 }
 catch {
+    $msg = Hide-Sources $_.Exception.Message
     Write-Host ''
-    Write-Host "Installation failed: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Installation failed: $msg" -ForegroundColor Red
     Write-Host ''
-    Write-Host 'CDN download failed. Check your internet connection and try again.' -ForegroundColor Yellow
-    Write-Host " CDN: $CdnBase/v1/public/installer/" -ForegroundColor Yellow
+    Write-Host 'Download failed. Check your internet connection and try again.' -ForegroundColor Yellow
     $logPath = Join-Path $env:TEMP 'hammer-install-last.log'
-    "$(Get-Date -Format o) ERROR: $($_.Exception.Message)`n$($_.ScriptStackTrace)" | Out-File -LiteralPath $logPath -Encoding UTF8
+    "$(Get-Date -Format o) ERROR: $msg`n$(Hide-Sources $_.ScriptStackTrace)" | Out-File -LiteralPath $logPath -Encoding UTF8
     Write-Host "Log saved to: $logPath" -ForegroundColor Yellow
     Read-Host 'Press Enter to close'
-    throw
+    return
 }
 finally {
     Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue

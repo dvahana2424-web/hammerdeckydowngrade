@@ -22,7 +22,7 @@ foreach ($src in $sources) {
         $script = Invoke-RestMethod -Uri $src -Headers @{'Cache-Control' = 'no-cache'}
         if ($script) { break }
     } catch {
-        Write-Host ('  source unavailable: {0}' -f $src.Split('?')[0]) -ForegroundColor DarkYellow
+        Write-Host ('  source unavailable ({0}), trying next ...' -f $(if ($src -like "$CdnBase*") { 'Cloudflare CDN' } else { 'mirror' })) -ForegroundColor DarkYellow
     }
 }
 if (-not $script) { throw 'Could not download the installer from any source. Check your internet connection and try again.' }
@@ -39,8 +39,9 @@ if (-not $isAdmin) {
 try {
 $Runner
 } catch {
-  "`$(Get-Date -Format o) ERROR: `$(`$_.Exception.Message)``n`$(`$_.ScriptStackTrace)" | Out-File -LiteralPath `$log -Encoding UTF8;
-  Write-Host "``nInstallation failed: `$(`$_.Exception.Message)" -ForegroundColor Red;
+  `$msg = `$_.Exception.Message -replace 'https?://[^\s''"]+', 'mirror';
+  "`$(Get-Date -Format o) ERROR: `$msg" | Out-File -LiteralPath `$log -Encoding UTF8;
+  Write-Host "``nInstallation failed: `$msg" -ForegroundColor Red;
   Write-Host "Log saved to: `$log" -ForegroundColor Yellow;
   Read-Host 'Press Enter to close';
   exit 1
