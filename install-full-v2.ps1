@@ -9,6 +9,8 @@ $ProgressPreference = 'Continue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $CdnBase = 'https://hammer-cdn.monzikmonzik.workers.dev'
+$GitHubRepo = 'dvahana2424-web/hammerdeckydowngrade'
+$GitHubBranch = 'Hammer-3.8-obfuscated'
 $InstallDir = 'C:\Program Files (x86)\Hammer'
 $AppName = 'Hammer 4.1'
 $Version = '4.1'
@@ -37,12 +39,15 @@ function Format-Span([double]$seconds) {
 
 function Get-PartUrls([string]$name) {
     $cb = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    @('{0}/v1/public/installer/{1}?cb={2}' -f $CdnBase, $name, $cb)
+    @(
+        ('{0}/v1/public/installer/{1}?cb={2}' -f $CdnBase, $name, $cb),
+        ('https://raw.githubusercontent.com/{0}/{1}/{2}' -f $GitHubRepo, [uri]::EscapeDataString($GitHubBranch), $name)
+    )
 }
 
 function Get-FileCurl([string]$url, [string]$dest, [string]$label) {
     if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) { return $false }
-    Write-Host '  downloading via curl ...' -ForegroundColor DarkGray
+    Write-Host '  falling back to curl ...' -ForegroundColor DarkGray
     $prevEap = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
@@ -117,9 +122,10 @@ function Get-File($urls, $dest, $label) {
 
     for ($try = 1; $try -le $maxTries; $try++) {
         foreach ($url in $urlList) {
-            if (Test-Path $dest) { Remove-Item $dest -Force -ErrorAction SilentlyContinue }
+            $host_ = ([uri]$url).Host
+            Write-Host ('  source: {0}' -f $host_) -ForegroundColor DarkGray
 
-            if (Get-FileCurl $url $dest $label) { return }
+            if (Test-Path $dest) { Remove-Item $dest -Force -ErrorAction SilentlyContinue }
 
             try {
                 if (Get-FileHttp $url $dest $label) { return }
@@ -127,6 +133,8 @@ function Get-File($urls, $dest, $label) {
                 $lastErr = $_
                 if (Test-Path $dest) { Remove-Item $dest -Force -ErrorAction SilentlyContinue }
             }
+
+            if (Get-FileCurl $url $dest $label) { return }
 
             try {
                 if (Get-FileWebRequest $url $dest $label) { return }
@@ -175,9 +183,12 @@ try {
         $dest = Join-Path $work $p
         $label = "Downloading $AppName - file $i of $($Parts.Count) ($p)"
         Write-Host ("  [{0}/{1}] {2}" -f $i, $Parts.Count, $p)
+        $swPart = [System.Diagnostics.Stopwatch]::StartNew()
         Get-File (Get-PartUrls $p) $dest $label
+        $swPart.Stop()
         $got = (Get-Item -LiteralPath $dest).Length
-        Write-Host ("  downloaded {0:N0} bytes" -f $got) -ForegroundColor DarkGray
+        $avg = if ($swPart.Elapsed.TotalSeconds -gt 0) { ($got / $swPart.Elapsed.TotalSeconds) / 1MB } else { 0 }
+        Write-Host ("  downloaded {0:N1} MB in {1} ({2:N1} MB/s avg)" -f ($got / 1MB), (Format-Span $swPart.Elapsed.TotalSeconds), $avg) -ForegroundColor DarkGray
         $expected = $ExpectedPartBytes[$p]
         if ($expected -gt 0 -and $got -ne $expected) {
             throw "Wrong size for $p (got $got, expected $expected). Retry in 1 minute."
