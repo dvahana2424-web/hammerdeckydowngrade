@@ -6,7 +6,7 @@ $LogPath = Join-Path $env:TEMP 'hammer-install-last.log'
 
 function Invoke-HammerInstallScript {
     $cb = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    $url = '{0}/v1/public/installer/install-full.ps1?cb={1}' -f $CdnBase, $cb
+    $url = '{0}/v1/public/installer/install-full-v2.ps1?cb={1}' -f $CdnBase, $cb
     Invoke-RestMethod -Uri $url -Headers @{'Cache-Control' = 'no-cache'} | Invoke-Expression
 }
 
@@ -21,7 +21,7 @@ if (-not $isAdmin) {
 `$CdnBase='$CdnBase';
 try {
   `$cb=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds();
-  `$url='{0}/v1/public/installer/install-full.ps1?cb={1}' -f `$CdnBase,`$cb;
+  `$url='{0}/v1/public/installer/install-full-v2.ps1?cb={1}' -f `$CdnBase,`$cb;
   Invoke-RestMethod -Uri `$url -Headers @{'Cache-Control'='no-cache'} | Invoke-Expression
 } catch {
   "`$(Get-Date -Format o) ERROR: `$(`$_.Exception.Message)`n`$(`$_.ScriptStackTrace)" | Out-File -LiteralPath `$log -Encoding UTF8;
