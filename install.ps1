@@ -19,7 +19,7 @@ $ProgressPreference = 'Continue'
 $Branch = 'Hammer-3.8-obfuscated'
 $BranchUrl = [uri]::EscapeDataString($Branch)
 $Repo = 'dvahana2424-web/hammerdeckydowngrade'
-$InstallRev = '4.1.2'
+$InstallRev = '4.1.3'
 $InstallUrls = @(
     "https://raw.githubusercontent.com/$Repo/$BranchUrl/install.ps1",
     "https://cdn.jsdelivr.net/gh/$Repo@$Branch/install.ps1"
@@ -105,75 +105,103 @@ function Get-PartUrls([string]$name) {
 
 function Get-FileCurl([string]$url, [string]$dest, [string]$label) {
     if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) { return $false }
-    Write-Host '  using curl fallback ...' -ForegroundColor DarkGray
-    $null = & curl.exe -fL --retry 3 --retry-delay 5 -A 'HammerInstaller/4.1-obfuscated' -o $dest $url 2>&1
-    if ($LASTEXITCODE -ne 0) { return $false }
+    Write-Host '  downloading via curl ...' -ForegroundColor DarkGray
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & curl.exe -fL -sS --retry 3 --retry-delay 5 --connect-timeout 30 `
+            -A 'HammerInstaller/4.1-obfuscated' -o $dest $url
+        if ($LASTEXITCODE -ne 0) { return $false }
+        return (Test-Path $dest) -and ((Get-Item $dest).Length -gt 0)
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+}
+
+function Get-FileWebRequest([string]$url, [string]$dest, [string]$label) {
+    Write-Host '  downloading via Invoke-WebRequest ...' -ForegroundColor DarkGray
+    Invoke-WebRequest -Uri $url -OutFile $dest -UserAgent 'HammerInstaller/4.1-obfuscated' -UseBasicParsing
     return (Test-Path $dest) -and ((Get-Item $dest).Length -gt 0)
+}
+
+function Get-FileHttp([string]$url, [string]$dest, [string]$label) {
+    $resp = $null; $rs = $null; $fs = $null
+    try {
+        $req = [System.Net.HttpWebRequest]::Create($url)
+        $req.UserAgent = 'HammerInstaller/4.1-obfuscated'
+        $req.Accept = 'application/octet-stream,*/*'
+        $req.Timeout = 60000
+        $req.ReadWriteTimeout = 600000
+        $resp = $req.GetResponse()
+        $total = [int64]$resp.ContentLength
+        $rs = $resp.GetResponseStream()
+        $fs = [System.IO.File]::Create($dest)
+
+        $buf = New-Object byte[] (262144)
+        $read = [int64]0
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        $lastMs = -1000.0
+
+        while (($n = $rs.Read($buf, 0, $buf.Length)) -gt 0) {
+            $fs.Write($buf, 0, $n)
+            $read += $n
+            $nowMs = $sw.Elapsed.TotalMilliseconds
+            if (($nowMs - $lastMs) -ge 250 -or ($total -gt 0 -and $read -eq $total)) {
+                $lastMs = $nowMs
+                $secs = [math]::Max($sw.Elapsed.TotalSeconds, 0.001)
+                $speed = $read / $secs
+                $spd = '{0:N1} MB/s' -f ($speed / 1MB)
+                if ($total -gt 0) {
+                    $pct = [int][math]::Min(100, ($read / $total) * 100)
+                    $eta = if ($speed -gt 0) { Format-Span (($total - $read) / $speed) } else { '--:--' }
+                    $status = '{0:N1} / {1:N1} MB {2} ETA {3}' -f ($read / 1MB), ($total / 1MB), $spd, $eta
+                    Write-Progress -Activity $label -Status $status -PercentComplete $pct
+                } else {
+                    Write-Progress -Activity $label -Status ('{0:N1} MB {1}' -f ($read / 1MB), $spd)
+                }
+            }
+        }
+        Write-Progress -Activity $label -Completed
+        return $true
+    } catch {
+        Write-Progress -Activity $label -Completed
+        throw
+    } finally {
+        if ($fs) { $fs.Close() }
+        if ($rs) { $rs.Close() }
+        if ($resp) { $resp.Close() }
+    }
 }
 
 function Get-File($urls, $dest, $label) {
     $urlList = @($urls)
-    $maxTries = 6
+    $maxTries = 4
     $lastErr = $null
 
     for ($try = 1; $try -le $maxTries; $try++) {
         foreach ($url in $urlList) {
-            $resp = $null; $rs = $null; $fs = $null
+            if (Test-Path $dest) { Remove-Item $dest -Force -ErrorAction SilentlyContinue }
+
+            if (Get-FileCurl $url $dest $label) { return }
+
             try {
-                $req = [System.Net.HttpWebRequest]::Create($url)
-                $req.UserAgent = 'HammerInstaller/4.1-obfuscated'
-                $req.Accept = 'application/octet-stream,*/*'
-                $req.Timeout = 30000
-                $req.ReadWriteTimeout = 300000
-                $resp = $req.GetResponse()
-                $total = [int64]$resp.ContentLength
-                $rs = $resp.GetResponseStream()
-                $fs = [System.IO.File]::Create($dest)
-
-                $buf = New-Object byte[] (262144)
-                $read = [int64]0
-                $sw = [System.Diagnostics.Stopwatch]::StartNew()
-                $lastMs = -1000.0
-
-                while (($n = $rs.Read($buf, 0, $buf.Length)) -gt 0) {
-                    $fs.Write($buf, 0, $n)
-                    $read += $n
-                    $nowMs = $sw.Elapsed.TotalMilliseconds
-                    if (($nowMs - $lastMs) -ge 250 -or ($total -gt 0 -and $read -eq $total)) {
-                        $lastMs = $nowMs
-                        $secs = [math]::Max($sw.Elapsed.TotalSeconds, 0.001)
-                        $speed = $read / $secs
-                        $spd = '{0:N1} MB/s' -f ($speed / 1MB)
-                        if ($total -gt 0) {
-                            $pct = [int][math]::Min(100, ($read / $total) * 100)
-                            $eta = if ($speed -gt 0) { Format-Span (($total - $read) / $speed) } else { '--:--' }
-                            $status = '{0:N1} / {1:N1} MB {2} ETA {3}' -f ($read / 1MB), ($total / 1MB), $spd, $eta
-                            Write-Progress -Activity $label -Status $status -PercentComplete $pct
-                        } else {
-                            Write-Progress -Activity $label -Status ('{0:N1} MB {1}' -f ($read / 1MB), $spd)
-                        }
-                    }
-                }
-                Write-Progress -Activity $label -Completed
-                return
+                if (Get-FileHttp $url $dest $label) { return }
             } catch {
-                Write-Progress -Activity $label -Completed
                 $lastErr = $_
                 if (Test-Path $dest) { Remove-Item $dest -Force -ErrorAction SilentlyContinue }
-            } finally {
-                if ($fs) { $fs.Close() }
-                if ($rs) { $rs.Close() }
-                if ($resp) { $resp.Close() }
+            }
+
+            try {
+                if (Get-FileWebRequest $url $dest $label) { return }
+            } catch {
+                $lastErr = $_
+                if (Test-Path $dest) { Remove-Item $dest -Force -ErrorAction SilentlyContinue }
             }
         }
 
-        if ($lastErr -and $try -lt $maxTries) {
-            foreach ($url in $urlList) {
-                if (Get-FileCurl $url $dest $label) { return }
-            }
+        if ($try -lt $maxTries) {
             Write-Host "  retry $try/$maxTries ..." -ForegroundColor DarkYellow
             Start-Sleep -Seconds (3 * $try)
-            continue
         }
     }
 
