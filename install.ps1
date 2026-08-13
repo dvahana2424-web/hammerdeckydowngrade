@@ -29,8 +29,8 @@ $InstallDir = 'C:\Program Files (x86)\Hammer'
 $AppName = 'Hammer 4.1'
 $Version = '4.1-obfuscated'
 $Publisher = 'Hammer'
-$ZipName = 'Hammer-4.1.zip'
-$Parts = @('Hammer-4.1.zip.001', 'Hammer-4.1.zip.002')  # auto-split at 90 MB; add .003+ if needed
+$ZipName = 'Hammer-4.1.1.zip'
+$Parts = @('Hammer-4.1.1.zip.001', 'Hammer-4.1.1.zip.002')
 
 # ---- Self-elevate to Administrator --------------------------------------
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
@@ -189,6 +189,16 @@ try {
             try { $in.CopyTo($out) } finally { $in.Close() }
         }
     } finally { $out.Close() }
+
+    $zipLen = (Get-Item -LiteralPath $zipPath).Length
+    Write-Host "Package size: $([math]::Round($zipLen/1MB,1)) MB" -ForegroundColor DarkGray
+  try {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $testZip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+        $testZip.Dispose()
+    } catch {
+        throw "Downloaded package is corrupt (stale CDN cache or incomplete part). Delete temp and retry, or wait 2 minutes.`n$($_.Exception.Message)"
+    }
 
     Get-Process -Name 'Hammer', 'SteamDbBridgeHost', 'packer' -ErrorAction SilentlyContinue |
         Stop-Process -Force -ErrorAction SilentlyContinue
