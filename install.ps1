@@ -30,7 +30,7 @@ $AppName = 'Hammer 4.1'
 $Version = '4.1-obfuscated'
 $Publisher = 'Hammer'
 $ZipName = 'Hammer-4.1.zip'
-$Parts = @('Hammer-4.1.zip.001')  # add .002, .003 if package exceeds 90 MB per part
+$Parts = @('Hammer-4.1.zip.001', 'Hammer-4.1.zip.002')  # auto-split at 90 MB; add .003+ if needed
 
 # ---- Self-elevate to Administrator --------------------------------------
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()

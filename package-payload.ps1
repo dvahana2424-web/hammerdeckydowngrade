@@ -1,32 +1,29 @@
 #Requires -Version 5.1
 <#
-.SYNOPSIS
-  Build Hammer 4.1 installer payload for Cloudflare CDN upload.
-
-.USAGE
-  powershell -ExecutionPolicy Bypass -File .\installer\package-payload.ps1
-
-.OUTPUT
-  installer\payload-out\Hammer-4.1.zip.001, .002, ...
+  Build Hammer 4.1 installer payload (includes offmode\dlhost.exe for Download Mode 2).
+  Output: Hammer-4.1.zip.001, .002, ... (90 MB parts) for CDN / branch push.
 #>
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-$Root = Split-Path $PSScriptRoot -Parent
-$PublishDir = Join-Path $Root 'publish\Hammer3.9-obfuscated'
-$FallbackDir = 'C:\Program Files (x86)\Hammer'
+$SourceDir = 'C:\Program Files (x86)\Hammer'
+$PublishDir = Join-Path (Split-Path $PSScriptRoot -Parent) 'hammer 3.9 beta\publish\Hammer3.9-obfuscated'
 $OutDir = Join-Path $PSScriptRoot 'payload-out'
 $ZipName = 'Hammer-4.1.zip'
 $PartSizeBytes = 90MB
 
 $IncludeFiles = @('Hammer.exe', 'hammer.ico')
+$OffmodeFiles = @('dlhost.exe')
+$DlhostFallbacks = @(
+    'C:\Program Files (x86)\Hammerbkp4.0\offmode\dlhost.exe',
+    'C:\Program Files (x86)\Hammer\offmode\dlhost.exe'
+)
 
 if (Test-Path (Join-Path $PublishDir 'Hammer.exe')) {
     $SourceDir = $PublishDir
     Write-Host "Using publish build: $SourceDir" -ForegroundColor Cyan
-} elseif (Test-Path (Join-Path $FallbackDir 'Hammer.exe')) {
-    $SourceDir = $FallbackDir
+} elseif (Test-Path (Join-Path $SourceDir 'Hammer.exe')) {
     Write-Host "Using installed build: $SourceDir" -ForegroundColor Yellow
 } else {
     throw "Hammer.exe not found. Run publish-obfuscated.ps1 first."
@@ -42,7 +39,7 @@ foreach ($name in $IncludeFiles) {
     $src = Join-Path $SourceDir $name
     if (-not (Test-Path $src)) {
         if ($name -eq 'hammer.ico') {
-            $alt = Join-Path $Root 'hammer.ico'
+            $alt = Join-Path $PSScriptRoot 'hammer.ico'
             if (Test-Path $alt) { $src = $alt } else { continue }
         } else {
             throw "Missing required file: $name"
@@ -50,6 +47,24 @@ foreach ($name in $IncludeFiles) {
     }
     Copy-Item -LiteralPath $src -Destination (Join-Path $staging $name) -Force
     Write-Host "  staged $name" -ForegroundColor DarkGray
+}
+
+$offmodeStaging = Join-Path $staging 'offmode'
+New-Item -ItemType Directory -Path $offmodeStaging -Force | Out-Null
+foreach ($name in $OffmodeFiles) {
+    $src = $null
+    $candidates = @(
+        (Join-Path (Join-Path $SourceDir 'offmode') $name)
+    ) + $DlhostFallbacks
+    foreach ($c in $candidates) {
+        if (Test-Path $c) { $src = $c; break }
+    }
+    if (-not $src) {
+        throw "Missing required file: offmode\$name"
+    }
+    Copy-Item -LiteralPath $src -Destination (Join-Path $offmodeStaging $name) -Force
+    $len = (Get-Item $src).Length
+    Write-Host "  staged offmode\$name ($([math]::Round($len/1MB,1)) MB)" -ForegroundColor DarkGray
 }
 
 $zipPath = Join-Path $env:TEMP ('hammer41_' + [Guid]::NewGuid().ToString('N') + '.zip')
@@ -91,5 +106,3 @@ try {
 $parts = Get-ChildItem $OutDir -Filter 'Hammer-4.1.zip.*' | Sort-Object Name
 Write-Host "Created $($parts.Count) parts in $OutDir" -ForegroundColor Green
 $parts | ForEach-Object { Write-Host "  $($_.Name) ($([math]::Round($_.Length/1MB,1)) MB)" }
-Write-Host ''
-Write-Host 'Next: upload to sojorepo via upload-payload.ps1' -ForegroundColor Cyan
