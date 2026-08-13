@@ -37,7 +37,7 @@ function Format-Span([double]$seconds) {
 
 function Get-PartUrls([string]$name) {
     $cb = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    @("$CdnBase/v1/public/installer/$name?cb=$cb")
+    @('{0}/v1/public/installer/{1}?cb={2}' -f $CdnBase, $name, $cb)
 }
 
 function Get-FileCurl([string]$url, [string]$dest, [string]$label) {

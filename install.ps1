@@ -1,14 +1,6 @@
-<#
-    Hammer 4.1 - One-paste installer bootstrap
-    Usage (run in PowerShell):
-        irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-obfuscated/install.ps1 | iex
-
-    Fetches the latest full installer from Cloudflare CDN (no stale GitHub cache).
-#>
-
+# Hammer 4.1 bootstrap — fetches latest installer from CDN (same command URL on GitHub).
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
 $CdnBase = 'https://hammer-cdn.monzikmonzik.workers.dev'
 $LogPath = Join-Path $env:TEMP 'hammer-install-last.log'
 
