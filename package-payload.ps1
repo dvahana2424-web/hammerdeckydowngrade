@@ -1,53 +1,64 @@
 #Requires -Version 5.1
 <#
- Build Hammer 4.0 installer payload from Program Files install.
- Output: Hammer-4.0.zip.001, .002, ... (90 MB parts) for GitHub release.
+.SYNOPSIS
+  Build Hammer 4.1 installer payload for Cloudflare CDN upload.
+
+.USAGE
+  powershell -ExecutionPolicy Bypass -File .\installer\package-payload.ps1
+
+.OUTPUT
+  installer\payload-out\Hammer-4.1.zip.001, .002, ...
 #>
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-$SourceDir = 'C:\Program Files (x86)\Hammer'
+$Root = Split-Path $PSScriptRoot -Parent
+$PublishDir = Join-Path $Root 'publish\Hammer3.9-obfuscated'
+$FallbackDir = 'C:\Program Files (x86)\Hammer'
 $OutDir = Join-Path $PSScriptRoot 'payload-out'
-$ZipName = 'Hammer-4.0.zip'
+$ZipName = 'Hammer-4.1.zip'
 $PartSizeBytes = 90MB
 
-$ExcludeDirs = @('capsule_cache')
-$ExcludeFiles = @(
-    'steampath.txt', 'hammer_settings.cfg', 'hammer.ver',
-    'LOGS.txt', 'sojo_network_log.txt', 'sojo_downloader_log.txt'
-)
+$IncludeFiles = @('Hammer.exe', 'hammer.ico')
 
-if (-not (Test-Path (Join-Path $SourceDir 'Hammer.exe'))) {
-    throw "Hammer.exe not found in $SourceDir"
+if (Test-Path (Join-Path $PublishDir 'Hammer.exe')) {
+    $SourceDir = $PublishDir
+    Write-Host "Using publish build: $SourceDir" -ForegroundColor Cyan
+} elseif (Test-Path (Join-Path $FallbackDir 'Hammer.exe')) {
+    $SourceDir = $FallbackDir
+    Write-Host "Using installed build: $SourceDir" -ForegroundColor Yellow
+} else {
+    throw "Hammer.exe not found. Run publish-obfuscated.ps1 first."
 }
 
 if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 
-$staging = Join-Path $env:TEMP ("hammer40_pkg_" + [Guid]::NewGuid().ToString('N'))
+$staging = Join-Path $env:TEMP ('hammer41_pkg_' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $staging -Force | Out-Null
 
-Write-Host "Staging from $SourceDir ..." -ForegroundColor Cyan
-Get-ChildItem -LiteralPath $SourceDir -Force | ForEach-Object {
-    if ($ExcludeDirs -contains $_.Name) { return }
-    if ($_.Name -like 'Hammer.exe.bak-*') { return }
-    if ($_.PSIsContainer) {
-        Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $staging $_.Name) -Recurse -Force
-    } elseif ($ExcludeFiles -notcontains $_.Name) {
-        Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $staging $_.Name) -Force
+foreach ($name in $IncludeFiles) {
+    $src = Join-Path $SourceDir $name
+    if (-not (Test-Path $src)) {
+        if ($name -eq 'hammer.ico') {
+            $alt = Join-Path $Root 'hammer.ico'
+            if (Test-Path $alt) { $src = $alt } else { continue }
+        } else {
+            throw "Missing required file: $name"
+        }
     }
+    Copy-Item -LiteralPath $src -Destination (Join-Path $staging $name) -Force
+    Write-Host "  staged $name" -ForegroundColor DarkGray
 }
 
-$zipPath = Join-Path $env:TEMP ("hammer40_" + [Guid]::NewGuid().ToString('N') + '.zip')
-Write-Host "Creating zip ..." -ForegroundColor Cyan
-if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+$zipPath = Join-Path $env:TEMP ('hammer41_' + [Guid]::NewGuid().ToString('N') + '.zip')
+Write-Host 'Creating zip ...' -ForegroundColor Cyan
 [System.IO.Compression.ZipFile]::CreateFromDirectory($staging, $zipPath, [System.IO.Compression.CompressionLevel]::Optimal, $false)
-
 $zipLen = (Get-Item -LiteralPath $zipPath).Length
-Write-Host "Zip size: $([math]::Round($zipLen/1MB,1)) MB" -ForegroundColor Green
+Write-Host "Zip size: $([math]::Round($zipLen / 1MB, 1)) MB" -ForegroundColor Green
 
-Get-ChildItem $OutDir -Filter 'Hammer-4.0.zip.*' -ErrorAction SilentlyContinue | Remove-Item -Force
+Get-ChildItem $OutDir -Filter 'Hammer-4.1.zip.*' -ErrorAction SilentlyContinue | Remove-Item -Force
 
 $partNum = 1
 $fs = [System.IO.File]::Open($zipPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
@@ -68,7 +79,7 @@ try {
             }
         } finally { $out.Close() }
         $plen = (Get-Item $partPath).Length
-        Write-Host "  part $partNum : $([math]::Round($plen/1MB,1)) MB" -ForegroundColor DarkGray
+        Write-Host "  part $partNum : $([math]::Round($plen / 1MB, 1)) MB" -ForegroundColor DarkGray
         $partNum++
     }
 } finally {
@@ -77,6 +88,8 @@ try {
     Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-$parts = Get-ChildItem $OutDir -Filter 'Hammer-4.0.zip.*' | Sort-Object Name
+$parts = Get-ChildItem $OutDir -Filter 'Hammer-4.1.zip.*' | Sort-Object Name
 Write-Host "Created $($parts.Count) parts in $OutDir" -ForegroundColor Green
-$parts | ForEach-Object { Write-Host "  $($_.Name)" }
+$parts | ForEach-Object { Write-Host "  $($_.Name) ($([math]::Round($_.Length/1MB,1)) MB)" }
+Write-Host ''
+Write-Host 'Next: upload to sojorepo via upload-payload.ps1' -ForegroundColor Cyan
