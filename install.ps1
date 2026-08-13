@@ -43,23 +43,37 @@ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
 if (-not $isAdmin) {
     Write-Host 'Requesting administrator rights...' -ForegroundColor Yellow
     $urlList = ($InstallUrls | ForEach-Object { "'$_'" }) -join ','
+    $logPath = Join-Path $env:TEMP 'hammer-install-last.log'
     $cmd = @"
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;
-`$urls=@($urlList);
-`$ok=`$false;
-`$cb=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds();
-foreach(`$u in `$urls){
-  try {
-    Invoke-RestMethod -Uri "`$u`?_=`$cb" -Headers @{'Cache-Control'='no-cache'} | Invoke-Expression;
-    `$ok=`$true; break
-  } catch { Write-Host "  fetch failed: `$u" -ForegroundColor DarkYellow }
+`$log='$logPath';
+try {
+  `$urls=@($urlList);
+  `$ok=`$false;
+  `$cb=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds();
+  foreach(`$u in `$urls){
+    try {
+      `$fetch = '{0}?_={1}' -f `$u, `$cb;
+      Invoke-RestMethod -Uri `$fetch -Headers @{'Cache-Control'='no-cache'} | Invoke-Expression;
+      `$ok=`$true; break
+    } catch {
+      Write-Host "  fetch failed: `$u" -ForegroundColor DarkYellow
+      Write-Host "  `$(`$_.Exception.Message)" -ForegroundColor DarkGray
+    }
+  }
+  if(-not `$ok){ throw 'Could not download install script. Check your internet connection and try again.' }
+} catch {
+  "`$(Get-Date -Format o) ERROR: `$(`$_.Exception.Message)`n`$(`$_.ScriptStackTrace)" | Out-File -LiteralPath `$log -Encoding UTF8;
+  Write-Host "`nInstallation failed: `$(`$_.Exception.Message)" -ForegroundColor Red;
+  Write-Host "Log saved to: `$log" -ForegroundColor Yellow;
+  Read-Host 'Press Enter to close';
+  exit 1
 }
-if(-not `$ok){ throw 'Could not download install script. Check your internet connection and try again.' }
 "@
     $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cmd))
     try {
         Start-Process powershell.exe -Verb RunAs -ArgumentList @(
-            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $b64
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-EncodedCommand', $b64
         ) | Out-Null
     } catch {
         Write-Host 'Administrator rights are required. Installation cancelled.' -ForegroundColor Red
@@ -300,12 +314,18 @@ catch {
     Write-Host ''
     Write-Host 'CDN download failed. Check your internet connection and try again.' -ForegroundColor Yellow
     Write-Host " CDN: $CdnBase/v1/public/installer/" -ForegroundColor Yellow
+    $logPath = Join-Path $env:TEMP 'hammer-install-last.log'
+    "$(Get-Date -Format o) ERROR: $($_.Exception.Message)`n$($_.ScriptStackTrace)" | Out-File -LiteralPath $logPath -Encoding UTF8
+    Write-Host "Log saved to: $logPath" -ForegroundColor Yellow
+    Read-Host 'Press Enter to close'
     throw
 }
 finally {
     Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host ''
-Write-Host 'Press any key to exit...'
-try { $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown') } catch {}
+if ($Host.Name -eq 'ConsoleHost') {
+    Write-Host ''
+    Write-Host 'Press Enter to close...'
+    try { Read-Host | Out-Null } catch {}
+}
