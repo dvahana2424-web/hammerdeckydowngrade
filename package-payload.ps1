@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
-  Build Hammer 3.9 installer payload from Program Files install.
-  Output: Hammer-3.9.zip.001, .002, ... (90 MB parts) for GitHub release.
+ Build Hammer 4.0 installer payload from Program Files install.
+ Output: Hammer-4.0.zip.001, .002, ... (90 MB parts) for GitHub release.
 #>
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression
@@ -9,7 +9,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $SourceDir = 'C:\Program Files (x86)\Hammer'
 $OutDir = Join-Path $PSScriptRoot 'payload-out'
-$ZipName = 'Hammer-3.9.zip'
+$ZipName = 'Hammer-4.0.zip'
 $PartSizeBytes = 90MB
 
 $ExcludeDirs = @('capsule_cache')
@@ -25,7 +25,7 @@ if (-not (Test-Path (Join-Path $SourceDir 'Hammer.exe'))) {
 if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 
-$staging = Join-Path $env:TEMP ("hammer39_pkg_" + [Guid]::NewGuid().ToString('N'))
+$staging = Join-Path $env:TEMP ("hammer40_pkg_" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $staging -Force | Out-Null
 
 Write-Host "Staging from $SourceDir ..." -ForegroundColor Cyan
@@ -39,7 +39,7 @@ Get-ChildItem -LiteralPath $SourceDir -Force | ForEach-Object {
     }
 }
 
-$zipPath = Join-Path $env:TEMP ("hammer39_" + [Guid]::NewGuid().ToString('N') + '.zip')
+$zipPath = Join-Path $env:TEMP ("hammer40_" + [Guid]::NewGuid().ToString('N') + '.zip')
 Write-Host "Creating zip ..." -ForegroundColor Cyan
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 [System.IO.Compression.ZipFile]::CreateFromDirectory($staging, $zipPath, [System.IO.Compression.CompressionLevel]::Optimal, $false)
@@ -47,7 +47,7 @@ if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 $zipLen = (Get-Item -LiteralPath $zipPath).Length
 Write-Host "Zip size: $([math]::Round($zipLen/1MB,1)) MB" -ForegroundColor Green
 
-Get-ChildItem $OutDir -Filter 'Hammer-3.9.zip.*' -ErrorAction SilentlyContinue | Remove-Item -Force
+Get-ChildItem $OutDir -Filter 'Hammer-4.0.zip.*' -ErrorAction SilentlyContinue | Remove-Item -Force
 
 $partNum = 1
 $fs = [System.IO.File]::Open($zipPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
@@ -77,6 +77,6 @@ try {
     Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-$parts = Get-ChildItem $OutDir -Filter 'Hammer-3.9.zip.*' | Sort-Object Name
+$parts = Get-ChildItem $OutDir -Filter 'Hammer-4.0.zip.*' | Sort-Object Name
 Write-Host "Created $($parts.Count) parts in $OutDir" -ForegroundColor Green
 $parts | ForEach-Object { Write-Host "  $($_.Name)" }

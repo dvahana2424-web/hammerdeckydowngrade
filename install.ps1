@@ -1,12 +1,12 @@
 <#
-    Hammer 3.9 (obfuscated) - One-paste installer
+    Hammer 4.0 (obfuscated) - One-paste installer
     Usage (run in PowerShell) — same URL as 3.8 branch name:
         irm https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/Hammer-3.8-obfuscated/install.ps1 | iex
 
     jsDelivr alternate:
         irm https://cdn.jsdelivr.net/gh/dvahana2424-web/hammerdeckydowngrade@Hammer-3.8-obfuscated/install.ps1 | iex
 
-    Downloads the Hammer 3.9 obfuscated payload, installs it to
+    Downloads the Hammer 4.0 obfuscated payload, installs it to
     "C:\Program Files (x86)\Hammer", creates a Desktop shortcut and
     registers an entry in Control Panel > Programs (Uninstall).
 #>
@@ -19,7 +19,7 @@ $ProgressPreference     = 'Continue'
 $Branch      = 'Hammer-3.8-obfuscated'
 $BranchUrl   = [uri]::EscapeDataString($Branch)
 $Repo        = 'dvahana2424-web/hammerdeckydowngrade'
-$ReleaseTag  = 'v3.9-obfuscated'
+$ReleaseTag  = 'v4.0-obfuscated'
 # Prefer stable branch raw URL for UAC re-launch (always latest on this branch).
 $InstallUrls = @(
     "https://raw.githubusercontent.com/$Repo/$BranchUrl/install.ps1",
@@ -27,10 +27,10 @@ $InstallUrls = @(
 )
 $InstallUrl  = $InstallUrls[0]
 $InstallDir = "C:\Program Files (x86)\Hammer"
-$AppName    = 'Hammer 3.9'
-$Version    = '3.9-obfuscated'
+$AppName    = 'Hammer 4.0'
+$Version    = '4.0-obfuscated'
 $Publisher  = 'Hammer'
-$Parts      = @('Hammer-3.9.zip.001', 'Hammer-3.9.zip.002')
+$Parts      = @('Hammer-4.0.zip.001', 'Hammer-4.0.zip.002')
 
 # ---- Self-elevate to Administrator --------------------------------------
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
@@ -55,9 +55,9 @@ Write-Host "  Installing $AppName (obfuscated)" -ForegroundColor Cyan
 Write-Host "==============================================" -ForegroundColor Cyan
 
 # ---- Workspace ----------------------------------------------------------
-$work = Join-Path $env:TEMP ("hammer39_" + [Guid]::NewGuid().ToString('N'))
+$work = Join-Path $env:TEMP ("hammer40_" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work -Force | Out-Null
-$zipPath = Join-Path $work 'Hammer-3.9.zip'
+$zipPath = Join-Path $work 'Hammer-4.0.zip'
 
 function Format-Span([double]$seconds) {
     if ($seconds -lt 0 -or [double]::IsInfinity($seconds) -or [double]::IsNaN($seconds)) { return '--:--' }
@@ -86,7 +86,7 @@ function Get-RetryWaitSeconds([int]$attempt, [System.Net.WebException]$webEx) {
 function Get-FileCurl([string]$url, [string]$dest, [string]$label) {
     if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) { return $false }
     Write-Host "   using curl fallback ..." -ForegroundColor DarkGray
-    $null = & curl.exe -fL --retry 3 --retry-delay 5 -A 'HammerInstaller/3.9-obfuscated' -o $dest $url 2>&1
+    $null = & curl.exe -fL --retry 3 --retry-delay 5 -A 'HammerInstaller/4.0-obfuscated' -o $dest $url 2>&1
     if ($LASTEXITCODE -ne 0) { return $false }
     return (Test-Path $dest) -and ((Get-Item $dest).Length -gt 0)
 }
@@ -101,7 +101,7 @@ function Get-File($urls, $dest, $label) {
             $resp = $null; $rs = $null; $fs = $null
             try {
                 $req = [System.Net.HttpWebRequest]::Create($url)
-                $req.UserAgent        = 'HammerInstaller/3.9-obfuscated'
+                $req.UserAgent        = 'HammerInstaller/4.0-obfuscated'
                 $req.Accept           = 'application/octet-stream,*/*'
                 $req.Timeout          = 30000
                 $req.ReadWriteTimeout = 120000
