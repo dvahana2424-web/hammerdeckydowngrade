@@ -1,4 +1,4 @@
-# Hammer 4.1 bootstrap — fetches latest installer from CDN (same command URL on GitHub).
+# Hammer 4.2 bootstrap — fetches latest installer from CDN (same command URL on GitHub).
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $CdnBase = 'https://hammer-cdn.monzikmonzik.workers.dev'
