@@ -1,11 +1,11 @@
-# Hammer 4.2 bootstrap — fetches latest installer from CDN (same command URL on GitHub).
+# HammerRetro 1.0 bootstrap — fetches latest installer from CDN.
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $CdnBase = 'https://hammer-cdn.monzikmonzik.workers.dev'
 $Repo = 'dvahana2424-web/hammerdeckydowngrade'
-$Branch = 'Hammer-3.8-obfuscated'
-$ScriptName = 'install-full-v2.ps1'
-$LogPath = Join-Path $env:TEMP 'hammer-install-last.log'
+$Branch = 'HammerRetro-1.0'
+$ScriptName = 'install-hammerretro-full-v1.ps1'
+$LogPath = Join-Path $env:TEMP 'hammerretro-install-last.log'
 
 $Runner = @'
 $ErrorActionPreference = 'Stop'
