@@ -428,8 +428,12 @@ refresh_hammer_binaries() {
 	rm -rf "$tmp"
 
 	# Best-effort version stamp for the install log.
-	if strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.10"; then
+	if strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.11"; then
+		ok "Installed Hammer 1.1.11 (zipball-fallback) → $hammer_dir/"
+	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.10"; then
 		ok "Installed Hammer 1.1.10 (manifest-pin) → $hammer_dir/"
+	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "zipball-fallback"; then
+		ok "Installed Hammer zipball-fallback build → $hammer_dir/"
 	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "manifest-pin"; then
 		ok "Installed Hammer manifest-pin build → $hammer_dir/"
 	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.9-manifest"; then
