@@ -45,7 +45,7 @@ Removes Hammer + ValveOFF + hammer-decky + unlock hooks. Config is kept unless `
 5. Installs **Hammer + ValveOFF + hammer-decky** and wires the Desktop-Mode unlock.
 6. Applies the **Game-Mode unlock** (`steam-jupiter` patch on SteamOS,
    `/usr/local/bin/steam` wrapper on Bazzite/atomic).
-7. Refreshes `hammersteam.so` from `valveoff-1.5/bin/` (Hammer **1.1.11** zipball-fallback build).
+7. Refreshes `hammersteam.so`, `library-inject.so`, and `config.yaml` from `valveoff-1.5/` (Hammer 1.1.11 zipball-fallback build).
 
 ## One-time finishing step
 
@@ -77,6 +77,12 @@ Updates:
 - `config/config.yaml` → `~/.config/hammersteam/config.yaml`
 
 Keep your local config (`.so` files only):
+
+```bash
+KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
+```
+
+Or on an existing install:
 
 ```bash
 KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/update-hammer.sh | bash

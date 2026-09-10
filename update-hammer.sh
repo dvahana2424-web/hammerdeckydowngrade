@@ -23,7 +23,20 @@ BRANCH="valveoff-1.5"
 BASE_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}"
 
 HAMMER_DIR="${HAMMER_DIR:-$HOME/.local/share/Hammer}"
-CONFIG_DIR="${CONFIG_DIR:-$HOME/.config/hammersteam}"
+
+resolve_hammer_config_dir() {
+	if [ -n "${HAMMER_CONFIG_DIR:-}" ]; then
+		echo "$HAMMER_CONFIG_DIR"
+		return 0
+	fi
+	if [ -n "${XDG_CONFIG_HOME:-}" ]; then
+		echo "${XDG_CONFIG_HOME}/hammersteam"
+		return 0
+	fi
+	echo "${HOME}/.config/hammersteam"
+}
+
+CONFIG_DIR="${CONFIG_DIR:-$(resolve_hammer_config_dir)}"
 CONFIG_FILE="$CONFIG_DIR/config.yaml"
 
 HAMMER_SO="$HAMMER_DIR/hammersteam.so"
