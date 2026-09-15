@@ -42,9 +42,10 @@ ExtendedLogging: yes
 ManifestHookEnabled: yes
 ManifestPattern: "e8 ? ? ? ? 05 ? ? ? ? 55 89 e5 57 56 53 81 ec 10 01 00"
 GetManifestRequestCodeOffset: 0x1361ac0
-ManifestProvider: Ost
+ManifestProvider: Wudrm
 ManifestFallbackProvider: yes
-ManifestLocalCacheFallback: yes
+ManifestLocalCacheFallback: no
+ManifestLocalCacheFirst: no
 ManifestZipballFallback: yes
 ManifestZipballMaxBytes: 268435456
 ManifestZipballTimeoutSec: 300

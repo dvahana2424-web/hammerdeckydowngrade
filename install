@@ -485,7 +485,9 @@ refresh_hammer_from_github() {
 	rm -rf "$tmp"
 
 	# Best-effort version stamp for the install log.
-	if strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.11"; then
+	if strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.12"; then
+		ok "Installed Hammer 1.1.12 (ost-primary) → $hammer_dir/"
+	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.11"; then
 		ok "Installed Hammer 1.1.11 (zipball-fallback) → $hammer_dir/"
 	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.10"; then
 		ok "Installed Hammer 1.1.10 (manifest-pin) → $hammer_dir/"

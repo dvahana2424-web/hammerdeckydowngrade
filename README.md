@@ -45,7 +45,7 @@ Removes Hammer + ValveOFF + hammer-decky + unlock hooks. Config is kept unless `
 5. Installs **Hammer + ValveOFF + hammer-decky** and wires the Desktop-Mode unlock.
 6. Applies the **Game-Mode unlock** (`steam-jupiter` patch on SteamOS,
    `/usr/local/bin/steam` wrapper on Bazzite/atomic).
-7. Refreshes `hammersteam.so`, `library-inject.so`, and `config.yaml` from `valveoff-1.5/` (Hammer 1.1.11 zipball-fallback build).
+7. Refreshes `hammersteam.so`, `library-inject.so`, and `config.yaml` from `valveoff-1.5/` (Hammer 1.1.12 ost-primary build).
 
 ## One-time finishing step
 
@@ -132,9 +132,9 @@ Repository: [dvahana2424-web/hammerdeckydowngrade](https://github.com/dvahana242
 
 ## Contents (1.5)
 
-- **hammersteam.so** — Hammer **1.1.11** zipball-fallback (local depotcache → monzik CDN; includes 1.1.10 manifest pin)
+- **hammersteam.so** — Hammer **1.1.12** ost-primary (live GID + wudrm/OST first; CDN zipball extended fallback; includes 1.1.10 manifest pin)
 - **library-inject.so** — small audit helper that loads hammersteam.so
-- **config.yaml** — zipball + manifest-pin keys for Steam build `1788652215`
+- **config.yaml** — ost-primary + manifest-pin keys for Steam build `1788652215`
 - **ValveOFF 1.5** — obfuscated binary with manifest pin UI
 
 See `VERSION.txt` for build metadata.
