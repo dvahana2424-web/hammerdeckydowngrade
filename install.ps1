@@ -1,4 +1,4 @@
-# HammerRetro 1.0 bootstrap — fetches latest installer from CDN.
+# HammerRetro 1.2.7 bootstrap — fetches full installer from CDN / mirrors.
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $CdnBase = 'https://hammer-cdn.monzikmonzik.workers.dev'
