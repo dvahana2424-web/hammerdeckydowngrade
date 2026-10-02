@@ -57,7 +57,7 @@ ManifestDepots: []
 OwnershipTicketDiskFallback: no
 
 UserOwnsDepotHookEnabled: yes
-UserOwnsDepotOffset: 0x185f1b0
+UserOwnsDepotOffset: 0x17cc990
 UserOwnsDepotPattern: "55 e8 ? ? ? ? 81 c5 ? ? ? ? 57 56 53 83 ec 74 ff b4 24"
 
 SteamlessAutoPatchEnabled: yes
