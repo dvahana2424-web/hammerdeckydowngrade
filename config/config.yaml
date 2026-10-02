@@ -49,6 +49,7 @@ ManifestLocalCacheFirst: no
 ManifestZipballFallback: yes
 ManifestZipballMaxBytes: 268435456
 ManifestZipballTimeoutSec: 300
+ManifestServerUrl: "https://manifest.activateme.workers.dev"
 ManifestDepotAllowFromKeys: yes
 ManifestDepots: []
 
