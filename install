@@ -28,7 +28,7 @@
 #    6. Applies Game-Mode unlock (steam-jupiter on SteamOS, /usr/local/bin/steam
 #       wrapper on Bazzite/atomic).
 #    7. Refreshes hammersteam.so, library-inject.so, and config.yaml from
-#       valveoff-1.5/bin + config/ (same paths Hammer uses on SteamOS/Bazzite).
+#       valveoff-1.5/bin + config/ (Hammer 1.1.17 manifest-stack when bundled).
 #
 #  Override the bundle source if you self-host:
 #    VALVEOFF_BUNDLE_URL=https://example/valveoff-bundle.tar.gz curl ... | bash
