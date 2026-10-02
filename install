@@ -485,7 +485,9 @@ refresh_hammer_from_github() {
 	rm -rf "$tmp"
 
 	# Best-effort version stamp for the install log.
-	if strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.16"; then
+	if strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.17"; then
+		ok "Installed Hammer 1.1.17 (manifest-stack) → $hammer_dir/"
+	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.16"; then
 		ok "Installed Hammer 1.1.16 (manifest-stack) → $hammer_dir/"
 	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.15"; then
 		ok "Installed Hammer 1.1.15 (manifest-stack) → $hammer_dir/"

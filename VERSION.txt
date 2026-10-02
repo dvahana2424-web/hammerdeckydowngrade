@@ -1,11 +1,11 @@
 valveoff_version=1.5
 build_date=2026-10-02
 config_rev=2
-hammer_version=1.1.16
+hammer_version=1.1.17
 hammer_codename=manifest-stack
 hammer_decky_version=0.9.14
 hammersteam_bytes=17133080
-hammersteam_md5=f9bf33c633d26bcbefe865c01d60dc80
+hammersteam_md5=a7436567ab7482704d4353e40e20c6aa
 library_inject_bytes=26540
 library_inject_md5=fc644f3120d401fefef2d1764f8fa4cd
 steam_client_build=1788652215
