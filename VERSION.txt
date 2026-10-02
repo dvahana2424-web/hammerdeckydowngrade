@@ -1,5 +1,6 @@
 valveoff_version=1.5
 build_date=2026-10-02
+config_rev=2
 hammer_version=1.1.15
 hammer_codename=manifest-stack
 hammer_decky_version=0.9.14
