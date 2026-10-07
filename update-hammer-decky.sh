@@ -1,21 +1,16 @@
 #!/usr/bin/env bash
-# update-hammer-decky.sh — install hammer-decky from the split ValveOFF 1.5 bundle.
+# update-hammer-decky.sh — install hammer-decky 0.9.24 from valveoff-1.5 branch.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/update-hammer-decky.sh | bash
 #
-# ValveOFF 1.4 (main):
-#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer-decky.sh | bash
-#
 set -euo pipefail
 
 REPO="dvahana2424-web/hammerdeckydowngrade"
-BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-valveoff-1.5}"
-BUNDLE_FILE="valveoff-bundle.tar.gz"
-BUNDLE_RAW_BASE="${VALVEOFF_BUNDLE_RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${BUNDLE_BRANCH}}"
-BUNDLE_PARTS="${VALVEOFF_BUNDLE_PARTS:-00 01}"
-BUNDLE_URL="${VALVEOFF_BUNDLE_URL:-}"
-BUNDLE_DIRNAME="ValveOFF 1.5"
+BRANCH="${VALVEOFF_BRANCH:-valveoff-1.5}"
+HAMMER_DECKY_PKG="${HAMMER_DECKY_PKG:-hammer-decky-0.9.24.tar.gz}"
+HAMMER_DECKY_PKG_URL="${HAMMER_DECKY_PKG_URL:-https://raw.githubusercontent.com/dvahana2424-web/hamdeck/hammer-1.1.17/hammer-decky/${HAMMER_DECKY_PKG}}"
+RAW_BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 PLUGIN_DST="${HOME}/homebrew/plugins/hammer-decky"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "[ERR] need $1" >&2; exit 1; }; }
@@ -26,42 +21,20 @@ need mkdir
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/hammer-decky-update.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
-if [ -n "$BUNDLE_URL" ]; then
-	echo "[..] Downloading ${BUNDLE_FILE} from ${BUNDLE_URL} …"
-	if ! curl -fL --retry 3 --retry-delay 2 -o "${TMP}/${BUNDLE_FILE}" "$BUNDLE_URL"; then
-		echo "[ERR] Failed to download bundle: ${BUNDLE_URL}" >&2
-		exit 1
-	fi
-else
-	echo "[..] Downloading split bundle from ${BUNDLE_RAW_BASE} (parts: ${BUNDLE_PARTS}) …"
-	: > "${TMP}/${BUNDLE_FILE}"
-	for part in $BUNDLE_PARTS; do
-		url="${BUNDLE_RAW_BASE}/${BUNDLE_FILE}.${part}.part"
-		echo "[..]   part ${part} …"
-		if ! curl -fL --retry 3 --retry-delay 2 "$url" >> "${TMP}/${BUNDLE_FILE}"; then
-			echo "[ERR] Failed to download part ${part}: ${url}" >&2
-			exit 1
-		fi
-	done
-	want="$(curl -fsSL "${BUNDLE_RAW_BASE}/${BUNDLE_FILE}.sha256" 2>/dev/null | awk '{print $1}' | head -1 || true)"
-	if [ -n "$want" ] && command -v sha256sum >/dev/null 2>&1; then
-		got="$(sha256sum "${TMP}/${BUNDLE_FILE}" | awk '{print $1}')"
-		[ "$want" = "$got" ] || { echo "[ERR] Checksum mismatch (want $want got $got)." >&2; exit 1; }
-		echo "[OK] Checksum verified."
-	fi
-fi
+echo "[..] Downloading ${HAMMER_DECKY_PKG} …"
+curl -fsSL --retry 3 --retry-delay 2 \
+	-o "${TMP}/${HAMMER_DECKY_PKG}" "${HAMMER_DECKY_PKG_URL}"
 
-echo "[..] Extracting hammer-decky from bundle …"
-tar -xzf "${TMP}/${BUNDLE_FILE}" -C "$TMP" "${BUNDLE_DIRNAME}/hammer-decky"
-
-SRC="${TMP}/${BUNDLE_DIRNAME}/hammer-decky"
+echo "[..] Extracting …"
+tar -xzf "${TMP}/${HAMMER_DECKY_PKG}" -C "$TMP"
+SRC="${TMP}/hammer-decky"
 if [ ! -f "${SRC}/dist/index.js" ] || [ ! -f "${SRC}/plugin.json" ]; then
-	echo "[ERR] hammer-decky missing in bundle." >&2
+	echo "[ERR] hammer-decky missing in ${HAMMER_DECKY_PKG}." >&2
 	exit 1
 fi
 
 if grep -q 'React\.createElement' "${SRC}/dist/index.js" 2>/dev/null; then
-	echo "[ERR] Bundle hammer-decky dist uses React.createElement (broken on Decky 3.x)." >&2
+	echo "[ERR] dist uses React.createElement (broken on Decky 3.x)." >&2
 	exit 1
 fi
 
@@ -85,4 +58,4 @@ else
 	echo "[WARN] plugin_loader not running — restart Steam or run: sudo systemctl restart plugin_loader"
 fi
 
-echo "[OK] hammer-decky updated from bundle. Open Game Mode → ⋯ → Hammer Library."
+echo "[OK] hammer-decky updated (0.9.24). Game Mode → ⋯ → Hammer Library."

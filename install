@@ -36,10 +36,10 @@
 set -uo pipefail
 
 # Re-fetch this script when launched via a stale CDN copy (e.g. old checksum logic).
-# valveoff-install-rev=12
-if [ "${VALVEOFF_INSTALL_REV:-}" != "12" ]; then
-	export VALVEOFF_INSTALL_REV=12
-	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/install?rev=12&ts=$(date +%s)")
+# valveoff-install-rev=13
+if [ "${VALVEOFF_INSTALL_REV:-}" != "13" ]; then
+	export VALVEOFF_INSTALL_REV=13
+	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/install?rev=13&ts=$(date +%s)")
 fi
 
 # ── Config ──────────────────────────────────────────────────────────────────
@@ -53,6 +53,9 @@ BUNDLE_RAW_BASE="${VALVEOFF_BUNDLE_RAW_BASE:-https://raw.githubusercontent.com/$
 BRANCH_RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 # Authoritative checksum for the concatenated bundle parts on `valveoff-1.5`.
 BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-dfacebf7a9a9d92012b827ef118609fdb983438c3ab12478a9db0f2d4fed3ccf}"
+HAMMER_DECKY_PKG="${HAMMER_DECKY_PKG:-hammer-decky-0.9.24.tar.gz}"
+# Default tarball lives on hamdeck (small); override with HAMMER_DECKY_PKG_URL.
+HAMMER_DECKY_PKG_URL="${HAMMER_DECKY_PKG_URL:-https://raw.githubusercontent.com/dvahana2424-web/hamdeck/hammer-1.1.17/hammer-decky/${HAMMER_DECKY_PKG}}"
 # Space-separated list of part suffixes, concatenated in order.
 BUNDLE_PARTS="${VALVEOFF_BUNDLE_PARTS:-00 01}"
 # Optional single-file override (self-hosting): if set, skip the split parts.
@@ -509,11 +512,35 @@ refresh_hammer_from_github() {
 	fi
 }
 
-# Install hammer-decky from the extracted ValveOFF bundle (compiled dist only —
-# no source on this public repo). Re-run full install or update-hammer-decky.sh
-# to refresh the plugin from the release tarball.
+# Overlay the latest hammer-decky from a small tarball on the branch (avoids
+# re-downloading the full ~140MB valveoff bundle when only the plugin changed).
+overlay_hammer_decky_in_bundle() {
+	local url="${HAMMER_DECKY_PKG_URL:-$BRANCH_RAW_BASE/$HAMMER_DECKY_PKG}"
+	local tmp
+	tmp="$(mktemp -d "${TMPDIR:-/tmp}/hammer-decky-overlay.XXXXXX")"
+	info "Refreshing hammer-decky from $url …"
+	if ! curl -fsSL --retry 3 --retry-delay 2 -o "$tmp/$HAMMER_DECKY_PKG" "$url"; then
+		rm -rf "$tmp"
+		warn "Could not download $HAMMER_DECKY_PKG — using hammer-decky from ValveOFF bundle."
+		return 0
+	fi
+	mkdir -p "$DEST"
+	if ! tar -xzf "$tmp/$HAMMER_DECKY_PKG" -C "$DEST"; then
+		rm -rf "$tmp"
+		warn "Failed to extract $HAMMER_DECKY_PKG — using bundle copy."
+		return 0
+	fi
+	rm -rf "$tmp"
+	if grep -q '0\.9\.24' "$DEST/hammer-decky/main.py" 2>/dev/null; then
+		ok "hammer-decky 0.9.24 overlaid into $DEST/hammer-decky"
+	else
+		warn "Overlay extracted but version stamp unexpected — continuing anyway."
+	fi
+}
+
+# Install hammer-decky from $DEST/hammer-decky (bundle + optional overlay tarball).
 install_hammer_decky_from_bundle() {
-	title "hammer-decky (from ValveOFF bundle)"
+	title "hammer-decky (ValveOFF bundle + GitHub overlay)"
 	local dst="$HOME_DIR/homebrew/plugins/hammer-decky"
 	local src="$DEST/hammer-decky"
 
@@ -583,6 +610,7 @@ main() {
 	install_decky
 	install_core
 	refresh_hammer_from_github || true
+	overlay_hammer_decky_in_bundle
 	install_hammer_decky_from_bundle
 	apply_gamemode_unlock
 	relock_rootfs

@@ -1,13 +1,13 @@
 valveoff_version=1.5
-build_date=2026-10-02
-config_rev=3
+build_date=2026-10-08
+config_rev=4
 hammer_version=1.1.17
 hammer_codename=manifest-stack
-hammer_decky_version=0.9.14
+hammer_decky_version=0.9.24
 hammersteam_bytes=17134756
 hammersteam_md5=a7436567ab7482704d4353e40e20c6aa
 library_inject_bytes=26540
 library_inject_md5=fc644f3120d401fefef2d1764f8fa4cd
 steam_client_build=1788652215
 manifest_chain=manifest-stack->lua/wudrm/manifestdex->archive->extended:zipball/mirror/worker/localcache
-notes=ValveOFF 1.5 + Hammer 1.1.17 manifest-stack; GetManifestRequestCode hook fix; Sep 2026 offsets in config.yaml
+notes=ValveOFF 1.5 bundle refresh: hammer-decky 0.9.24 (Lookup/Found/Downloading + speed/ETA), config overwrite on install.sh install
