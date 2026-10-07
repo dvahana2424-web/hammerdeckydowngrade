@@ -36,10 +36,10 @@
 set -uo pipefail
 
 # Re-fetch this script when launched via a stale CDN copy (e.g. old checksum logic).
-# valveoff-install-rev=13
-if [ "${VALVEOFF_INSTALL_REV:-}" != "13" ]; then
-	export VALVEOFF_INSTALL_REV=13
-	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/install?rev=13&ts=$(date +%s)")
+# valveoff-install-rev=14
+if [ "${VALVEOFF_INSTALL_REV:-}" != "14" ]; then
+	export VALVEOFF_INSTALL_REV=14
+	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/install?rev=14&ts=$(date +%s)")
 fi
 
 # ── Config ──────────────────────────────────────────────────────────────────

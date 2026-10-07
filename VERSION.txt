@@ -1,5 +1,6 @@
 valveoff_version=1.5
 build_date=2026-10-08
+bundle_sha256=ee3f3279188e6ad56f2321b5da15d45df2bde5f0898c25011820f933ef0d1bc2
 config_rev=4
 hammer_version=1.1.17
 hammer_codename=manifest-stack
