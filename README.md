@@ -53,7 +53,7 @@ Removes Hammer + ValveOFF + hammer-decky + unlock hooks. Config is kept unless `
 5. Installs **Hammer + ValveOFF + hammer-decky** and wires the Desktop-Mode unlock.
 6. Applies the **Game-Mode unlock** (`steam-jupiter` patch on SteamOS,
    `/usr/local/bin/steam` wrapper on Bazzite/atomic).
-7. Overlays `hammersteam.so`, `library-inject.so`, and `config.yaml` from this branch (Steam **1791918634**, Hammer **1.1.17**).
+7. Overlays `hammersteam.so`, `library-inject.so`, and `config.yaml` from this branch (Steam **1791918634**, Hammer **1.1.18**).
 
 ## One-time finishing step
 
@@ -140,7 +140,7 @@ Repository: [dvahana2424-web/hammerdeckydowngrade](https://github.com/dvahana242
 
 ## Contents (1.5)
 
-- **hammersteam.so** — Hammer **1.1.17** manifest-stack (1.1.15 resolver + GetManifestRequestCode hook crash fix)
+- **hammersteam.so** — Hammer **1.1.18** manifest-stack (1.1.17 + protobuf layout auto-detect for achievements/tickets on Steam 1791918634)
 - **library-inject.so** — small audit helper that loads hammersteam.so
 - **config.yaml** — Sep 2026 offsets (`0x12e27b0` / `0x17cc990`), manifest-stack + manifest-pin for Steam build `1788652215`
 - **ValveOFF 1.5** — obfuscated binary with manifest pin UI

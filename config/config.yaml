@@ -88,12 +88,10 @@ PatternOverrides:
   "IClientRemoteStorage::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 65 dd 12 87"
   "IClientUGC::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 56 0c d2 71"
   "IClientUserStats::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 6b d6 e5 85"
+  "CUser::GetSubscribedApps": "e8 ? ? ? ? 89 c7 83 c4 10 85 c0 74 ? 8b 5d ? 39 d8 7e"
   "CAPIJob::GetPlayerStats": "e8 ? ? ? ? 83 c4 10 89 c5 e9 ? ? ? ? ? ?"
   "BBuildAndAsyncSendFrame": "55 89 e5 57 e8 ? ? ? ? 81 c7 ? ? ? ? 56 53 81 ec ac 00 00 00 8b"
   "RecvPkt": "55 89 e5 57 56 e8 ? ? ? ? 81 c6 ? ? ? ? 53 83 ec 1c 8b 86 ? ?"
-  # Oct 14 2026: protobuf layout mismatch SIGSEGV in tryHandleProtoBufSend/Recv.
-  "CProtoBufMsgBase::Send": "00 11 22 33 44 55 66 77 88 99 aa bb cc"
-  "CProtoBufMsgBase::InitFromPacket": "00 11 22 33 44 55 66 77 88 99 aa bb cc"
 
 CloudSaveEnabled: yes
 CloudSaveProvider: gdrive
