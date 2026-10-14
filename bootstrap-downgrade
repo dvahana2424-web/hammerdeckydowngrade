@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# One-paste Steam downgrade (Headcrab target build, no SLSsteam).
+# Bypasses GitHub raw CDN staleness — always fetches a fresh copy of the script.
+#
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap-downgrade | bash
+#
+set -uo pipefail
+REPO="${DOWNGRADE_REPO:-dvahana2424-web/hammerdeckydowngrade}"
+BRANCH="${DOWNGRADE_BRANCH:-valveoff-1.5}"
+exec bash <(curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/headcrab-downgrade-only?ts=$(date +%s)")
