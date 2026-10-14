@@ -40,9 +40,9 @@ Hammerlog: 2
 ExtendedLogging: yes
 
 ManifestHookEnabled: yes
-ManifestPattern: "e8 ? ? ? ? 05 ? ? ? ? 55 89 e5 57 56 53 81 ec 10 01 00"
-# steamclient.so Sep 2026 — ELF vaddr 0x12f27b0; Hammer config offset = vaddr - 0x10000.
-GetManifestRequestCodeOffset: 0x12e27b0
+ManifestPattern: "e8 ? ? ? ? 05 ? ? ? ? 55 89 e5 57 56 53 81 ec 20 01 00"
+# Pinned for steamclient build 1791918634 (Oct 13 2026) via hammer-pattern-scanner.
+GetManifestRequestCodeOffset: 0x14e9f80
 ManifestProvider: Wudrm
 ManifestFallbackProvider: yes
 ManifestLocalCacheFallback: no
@@ -53,11 +53,12 @@ ManifestZipballTimeoutSec: 300
 ManifestServerUrl: "https://manifest.activateme.workers.dev"
 ManifestDepotAllowFromKeys: yes
 ManifestDepots: []
+ManifestLuastoolsArchive: yes
 
 OwnershipTicketDiskFallback: no
 
 UserOwnsDepotHookEnabled: yes
-UserOwnsDepotOffset: 0x17cc990
+UserOwnsDepotOffset: 0x1a01410
 UserOwnsDepotPattern: "55 e8 ? ? ? ? 81 c5 ? ? ? ? 57 56 53 83 ec 74 ff b4 24"
 
 SteamlessAutoPatchEnabled: yes
@@ -79,13 +80,20 @@ RecvPktOffset: 0
 
 AllowMissingPatterns: yes
 PatternOverrides:
-  "IClientApps::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 37 9c 88 a6"
-  "IClientRemoteStorage::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 6c e8 2f 87"
-  "IClientUGC::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 62 0c d2 71"
-  "IClientUserStats::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 8f 65 6d 87"
-  "CAPIJob::GetPlayerStats": "e8 ? ? ? ? 83 c4 10 89 c5 e9 ? ? ? ? ? ? 80 be ? ? ? ? 00"
+  # Oct 13 2026 client: old push-0x990 signature is gone. This hit is unique and
+  # sits immediately after the 55 89 e5 57 56 prologue of the AppManager dispatcher.
+  # Without it, LaunchApp is never hooked and Steamless never runs.
+  "IClientAppManager::RunIPCFrame": "e8 ? ? ? ? 81 c6 ? ? ? ? 53 81 ec 80 07 00 00"
+  "IClientApps::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d ca 9c 88 a6"
+  "IClientRemoteStorage::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 65 dd 12 87"
+  "IClientUGC::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 56 0c d2 71"
+  "IClientUserStats::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 6b d6 e5 85"
+  "CAPIJob::GetPlayerStats": "e8 ? ? ? ? 83 c4 10 89 c5 e9 ? ? ? ? ? ?"
   "BBuildAndAsyncSendFrame": "55 89 e5 57 e8 ? ? ? ? 81 c7 ? ? ? ? 56 53 81 ec ac 00 00 00 8b"
   "RecvPkt": "55 89 e5 57 56 e8 ? ? ? ? 81 c6 ? ? ? ? 53 83 ec 1c 8b 86 ? ?"
+  # Oct 14 2026: protobuf layout mismatch SIGSEGV in tryHandleProtoBufSend/Recv.
+  "CProtoBufMsgBase::Send": "00 11 22 33 44 55 66 77 88 99 aa bb cc"
+  "CProtoBufMsgBase::InitFromPacket": "00 11 22 33 44 55 66 77 88 99 aa bb cc"
 
 CloudSaveEnabled: yes
 CloudSaveProvider: gdrive
@@ -96,7 +104,10 @@ CloudSaveSyncAchievements: no
 CloudSaveSyncPlaytime: no
 CloudSaveStorageSubdir: hammer_cloud_save
 CloudSaveGDriveRoot: HammerCloudSave
+# ELF vaddr of the "BuildDepotDependency" string-xref function (Oct 13 2026 client).
+# Offset is base+vaddr, not vaddr-0x10000 — the smaller value landed on a bad prologue.
+# Pattern left empty so a 4-hit prologue scan cannot hook the wrong function.
 ManifestPinEnabled: yes
 ManifestPinDisabledApps: [678950, 1803140]
-BuildDepotDependencyOffset: 0xfe5040
-BuildDepotDependencyPattern: "55 89 e5 57 56 e8 ? ? ? ? 81 c6 ? ? ? ? 53 81 ec 2c 02 00 00"
+BuildDepotDependencyOffset: 0x11781b0
+BuildDepotDependencyPattern: ""

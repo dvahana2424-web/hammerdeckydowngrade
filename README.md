@@ -1,22 +1,30 @@
-# ValveOFF 1.5 — one-paste install
+# Steam 1791918634 — one-paste install
 
 Works on **SteamOS (Steam Deck)**, **Bazzite**, and most other Linux distros.
 
-This branch (`valveoff-1.5`) is **separate from `main` (ValveOFF 1.4)**. The 1.4
-install commands are unchanged on `main`.
+This branch pins Hammer for Steam client build **1791918634**. It still downloads
+the ValveOFF 1.5 bundle (Decky, hammer-decky, unlock scripts), then replaces
+`hammersteam.so`, `library-inject.so`, and `config.yaml` with the copies on
+this branch.
 
-## Install (ValveOFF 1.5)
-
-Open **Konsole** in Desktop Mode (as your normal user, *not* root) and paste:
+The older command is unchanged on `valveoff-1.5`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
 ```
 
+## Install (Steam 1791918634)
+
+Open **Konsole** in Desktop Mode (as your normal user, *not* root) and paste:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/bootstrap | bash
+```
+
 Or directly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/install | bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/install | bash
 ```
 
 You will be asked for your **sudo password once**. Everything else is automatic.
@@ -26,7 +34,7 @@ You will be asked for your **sudo password once**. Everything else is automatic.
 Close Steam first, then paste:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/uninstall | bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/uninstall | bash
 ```
 
 Removes Hammer + ValveOFF + hammer-decky + unlock hooks. Config is kept unless `REMOVE_CONFIG=1`.
@@ -45,7 +53,7 @@ Removes Hammer + ValveOFF + hammer-decky + unlock hooks. Config is kept unless `
 5. Installs **Hammer + ValveOFF + hammer-decky** and wires the Desktop-Mode unlock.
 6. Applies the **Game-Mode unlock** (`steam-jupiter` patch on SteamOS,
    `/usr/local/bin/steam` wrapper on Bazzite/atomic).
-7. Refreshes `hammersteam.so`, `library-inject.so`, and `config.yaml` from `valveoff-1.5/` (Hammer **1.1.17** manifest-stack when bundled).
+7. Overlays `hammersteam.so`, `library-inject.so`, and `config.yaml` from this branch (Steam **1791918634**, Hammer **1.1.17**).
 
 ## One-time finishing step
 
@@ -63,12 +71,12 @@ cd "$HOME/Downloads/ValveOFF 1.5"
 ./install.sh uninstall    # remove everything (keeps config)
 ```
 
-## Quick Hammer update (ValveOFF 1.5)
+## Quick Hammer update (Steam 1791918634)
 
 Close Steam first, then paste:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/update-hammer.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/update-hammer.sh | bash
 ```
 
 Updates:
@@ -79,13 +87,13 @@ Updates:
 Keep your local config (`.so` files only):
 
 ```bash
-KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
+KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/bootstrap | bash
 ```
 
 Or on an existing install:
 
 ```bash
-KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/update-hammer.sh | bash
+KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/update-hammer.sh | bash
 ```
 
 ## Update hammer-decky plugin only
@@ -99,12 +107,12 @@ curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrad
 The bundle ships as split raw files on
 [`valveoff-1.5`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/valveoff-1.5)
 (`valveoff-bundle.tar.gz.00.part`, `…01.part`, `…sha256`). The installer
-concatenates the parts, verifies the SHA256, then refreshes `hammersteam.so` from
-`valveoff-1.5/bin/`.
+concatenates the parts, verifies the SHA256, then overlays `hammersteam.so`,
+`library-inject.so`, and `config.yaml` from `steam-1791918634`.
 
 ```bash
 VALVEOFF_BUNDLE_URL=https://example.com/valveoff-bundle.tar.gz \
-  curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/install | bash
+  curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/install | bash
 ```
 
 ---

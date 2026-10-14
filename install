@@ -4,13 +4,13 @@
 #
 #  Usage (Desktop Mode → Konsole, do NOT run as root):
 #
-#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/bootstrap | bash
 #
 #  Prefer `bootstrap` over `install` directly — GitHub raw CDN can serve a stale
 #  `install` copy for several minutes after an update (checksum / logic fixes).
 #
-#  Legacy (may hit CDN cache on Steam Deck):
-#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/install | bash
+#  Steam 1791918634 (this branch). The older ValveOFF 1.5 command is unchanged:
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
 #
 #  ValveOFF 1.4 (unchanged — do NOT use this branch for 1.4):
 #    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install | bash
@@ -27,8 +27,9 @@
 #    5. Installs Hammer + ValveOFF + hammer-decky and wires Desktop-Mode unlock.
 #    6. Applies Game-Mode unlock (steam-jupiter on SteamOS, /usr/local/bin/steam
 #       wrapper on Bazzite/atomic).
-#    7. Refreshes hammersteam.so, library-inject.so, and config.yaml from
-#       valveoff-1.5/bin + config/ (Hammer 1.1.17 manifest-stack when bundled).
+#    7. Overlays hammersteam.so, library-inject.so, and config.yaml pinned for
+#       Steam client build 1791918634 (this branch). The rest of the bundle
+#       still comes from valveoff-1.5.
 #
 #  Override the bundle source if you self-host:
 #    VALVEOFF_BUNDLE_URL=https://example/valveoff-bundle.tar.gz curl ... | bash
@@ -36,18 +37,20 @@
 set -uo pipefail
 
 # Re-fetch this script when launched via a stale CDN copy (e.g. old checksum logic).
-# valveoff-install-rev=14
-if [ "${VALVEOFF_INSTALL_REV:-}" != "14" ]; then
-	export VALVEOFF_INSTALL_REV=14
-	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/install?rev=14&ts=$(date +%s)")
+# steam-1791918634-install-rev=1791918634
+if [ "${VALVEOFF_INSTALL_REV:-}" != "1791918634" ]; then
+	export VALVEOFF_INSTALL_REV=1791918634
+	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/install?rev=1791918634&ts=$(date +%s)")
 fi
 
 # ── Config ──────────────────────────────────────────────────────────────────
 # ValveOFF 1.5 branch — separate from main (ValveOFF 1.4). Do not point 1.4
 # installs here; use `main` for 1.4.
 REPO="dvahana2424-web/hammerdeckydowngrade"
-BRANCH="valveoff-1.5"
-BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-$BRANCH}"
+BRANCH="steam-1791918634"
+# Bundle parts stay on valveoff-1.5. This branch only replaces the .so files
+# and config.yaml after that download.
+BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-valveoff-1.5}"
 BUNDLE_FILE="valveoff-bundle.tar.gz"
 BUNDLE_RAW_BASE="${VALVEOFF_BUNDLE_RAW_BASE:-https://raw.githubusercontent.com/$REPO/$BUNDLE_BRANCH}"
 BRANCH_RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
@@ -399,10 +402,9 @@ install_core() {
 		|| warn "Core install reported a non-zero exit — see messages above."
 }
 
-# Always pull hammersteam.so + library-inject.so + config.yaml from valveoff-1.5
-# after the bundle install. The tarball can lag behind `bin/` / `config/` on the
-# same branch. Paths mirror Hammer's C++ resolver (HAMMER_CONFIG_DIR →
-# XDG_CONFIG_HOME/hammersteam → ~/.config/hammersteam).
+# Always pull hammersteam.so + library-inject.so + config.yaml from
+# steam-1791918634 after the valveoff-1.5 bundle install. Paths mirror Hammer's
+# C++ resolver (HAMMER_CONFIG_DIR → XDG_CONFIG_HOME/hammersteam → ~/.config/hammersteam).
 resolve_hammer_config_dir() {
 	if [ -n "${HAMMER_CONFIG_DIR:-}" ]; then
 		echo "$HAMMER_CONFIG_DIR"
@@ -416,7 +418,7 @@ resolve_hammer_config_dir() {
 }
 
 refresh_hammer_from_github() {
-	title "Refresh Hammer from valveoff-1.5 (bin + config.yaml)"
+	title "Refresh Hammer for Steam 1791918634 (bin + config.yaml)"
 	local hammer_dir="$HOME_DIR/.local/share/Hammer"
 	local config_dir config_file
 	config_dir="$(resolve_hammer_config_dir)"

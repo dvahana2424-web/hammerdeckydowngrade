@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # update-hammer.sh — download latest hammersteam.so, library-inject.so, config.yaml
-# from GitHub (valveoff-1.5 branch) and install to standard Hammer paths.
+# from GitHub (steam-1791918634 branch) and install to standard Hammer paths.
 #
 # Upload newer files to:
-#   https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/valveoff-1.5/bin
-#   https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/valveoff-1.5/config
+#   https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/steam-1791918634/bin
+#   https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/steam-1791918634/config
 #
 # One-paste update (close Steam first):
-#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/update-hammer.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/update-hammer.sh | bash
 #
 # Keep your local config.yaml (only update the .so files):
-#   KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/update-hammer.sh | bash
+#   KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/update-hammer.sh | bash
 #
 # ValveOFF 1.4 (main branch — unchanged):
 #   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer.sh | bash
@@ -19,7 +19,7 @@ set -euo pipefail
 
 REPO_OWNER="dvahana2424-web"
 REPO_NAME="hammerdeckydowngrade"
-BRANCH="valveoff-1.5"
+BRANCH="steam-1791918634"
 BASE_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}"
 
 HAMMER_DIR="${HAMMER_DIR:-$HOME/.local/share/Hammer}"
