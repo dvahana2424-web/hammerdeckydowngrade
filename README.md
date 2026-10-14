@@ -151,9 +151,24 @@ chmod 755 ~/.local/share/Hammer/*.so
 
 Restart Steam after updating.
 
-## Steam downgrade (build 1781041600)
+## Steam downgrade only — Headcrab build `1788652215` (no SLSsteam)
 
-Same script as `main` — shared `steam-cache/`:
+Close Steam first. Downloads the client from Valve’s CDN, downgrades via local
+package server (same idea as [headcrab.sh](https://raw.githubusercontent.com/Deadboy666/h3adcr-b/refs/heads/main/headcrab.sh)), writes `steam.cfg` so Steam does not auto-update, and does **not** install SLSsteam or patch `steam.sh`.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap-downgrade | bash
+```
+
+Direct script (may hit GitHub raw CDN cache right after an update):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/headcrab-downgrade-only | bash
+```
+
+## Steam downgrade (older build 1781041600)
+
+Pre-staged cache on GitHub — shared `steam-cache/`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/downgrade-steam | bash

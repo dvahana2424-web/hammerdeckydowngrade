@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# headcrab-downgrade-only — Steam client downgrade only (Headcrab target build).
+#
+# Same downgrade idea as Deadboy666/headcrab.sh (local package server + textmode
+# update) but WITHOUT SLSsteam, Cloud Redirect, steam.sh patches, or LD_AUDIT.
+# Writes steam.cfg so Steam does not auto-update after downgrade.
+#
+# Close Steam first, then:
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap-downgrade | bash
+#
+set -euo pipefail
+
+REPO_OWNER="${DOWNGRADE_REPO_OWNER:-dvahana2424-web}"
+REPO_NAME="${DOWNGRADE_REPO:-hammerdeckydowngrade}"
+BRANCH="${DOWNGRADE_BRANCH:-valveoff-1.5}"
+BASE_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}"
+
+# Headcrab-compatible stable build (see headcrab.sh HeadcrabCompatibleClientVer)
+STEAM_VERSION="${STEAM_VERSION:-1788652215}"
+# SteamTracking commit that ships ClientManifest/steam_client_ubuntu12 @ this build
+STEAM_TRACKING_SHA="${STEAM_TRACKING_SHA:-bbc717da8ddd35ac9a091eb87664ae06d64c7145}"
+PARALLEL="${PARALLEL:-4}"
+SKIP_STAGE="${SKIP_STAGE:-0}"
+
+if [[ -t 1 ]]; then
+	C_RST=$'\033[0m'; C_GRN=$'\033[32m'; C_YEL=$'\033[33m'; C_RED=$'\033[31m'; C_CYN=$'\033[36m'; C_B=$'\033[1m'
+else
+	C_RST=; C_GRN=; C_YEL=; C_RED=; C_CYN=; C_B=
+fi
+
+info()  { printf '%b\n' "${C_CYN}[headcrab-downgrade]${C_RST} $*"; }
+ok()    { printf '%b\n' "${C_GRN}[headcrab-downgrade]${C_RST} $*"; }
+warn()  { printf '%b\n' "${C_YEL}[headcrab-downgrade]${C_RST} $*"; }
+err()   { printf '%b\n' "${C_RED}[headcrab-downgrade]${C_RST} $*" >&2; }
+die()   { err "$@"; exit 1; }
+
+need_cmd() {
+	command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
+}
+
+download() {
+	local url="$1" dest="$2"
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL --retry 3 --retry-delay 2 -o "$dest" "$url"
+	elif command -v wget >/dev/null 2>&1; then
+		wget -q -O "$dest" "$url"
+	else
+		die "Need curl or wget."
+	fi
+	[[ -s "$dest" ]] || die "Download failed or empty: $url"
+}
+
+steam_running() {
+	local prog pid state
+	for prog in steam steamwebhelper reaper; do
+		while read -r pid; do
+			[[ -n "$pid" ]] || continue
+			state="$(awk '{print $3}' "/proc/$pid/stat" 2>/dev/null)" || continue
+			[[ "$state" == "Z" ]] && continue
+			return 0
+		done < <(pgrep -x "$prog" 2>/dev/null || true)
+	done
+	return 1
+}
+
+main() {
+	need_cmd python3
+
+	printf '\n%bHeadcrab-style Steam downgrade only (no SLSsteam)%b\n' "$C_B" "$C_RST"
+	info "Target Steam build: ${STEAM_VERSION}"
+	info "Manifest SHA: ${STEAM_TRACKING_SHA:0:12}…"
+	info "Helper scripts: ${BASE_URL}/steam-cache/"
+
+	if steam_running; then
+		die "Steam is still running." \
+			"Close Steam (tray → Exit), or run: steam -shutdown"
+	fi
+
+	local tmp cache_subdir cache_dir
+	tmp="$(mktemp -d "${TMPDIR:-/tmp}/headcrab-downgrade.XXXXXX")"
+	trap 'rm -rf "$tmp"' EXIT
+
+	local stage_py ensure_py apply_py
+	stage_py="$tmp/stage-build.py"
+	ensure_py="$tmp/ensure-zipvz.py"
+	apply_py="$tmp/apply-downgrade.py"
+
+	download "${BASE_URL}/steam-cache/stage-build.py" "$stage_py"
+	download "${BASE_URL}/steam-cache/ensure-zipvz.py" "$ensure_py"
+	download "${BASE_URL}/steam-cache/apply-downgrade.py" "$apply_py"
+	chmod +x "$stage_py" "$ensure_py" "$apply_py"
+
+	if [[ "$SKIP_STAGE" == "1" ]]; then
+		warn "SKIP_STAGE=1 — using existing cache under ~/.cache/hammer-downgrader/"
+		cache_subdir="${CACHE_SUBDIR:-}"
+		[[ -n "$cache_subdir" ]] || die "Set CACHE_SUBDIR= when SKIP_STAGE=1"
+	else
+		info "Staging client packages from Valve CDN (this may take a while) …"
+		cache_subdir="$(
+			python3 "$stage_py" \
+				--version "$STEAM_VERSION" \
+				--sha "$STEAM_TRACKING_SHA" \
+				--parallel "$PARALLEL"
+		)" || die "Staging failed"
+		[[ -n "$cache_subdir" ]] || die "Staging did not return cache id"
+	fi
+
+	cache_dir="${CACHE_ROOT:-$HOME/.cache/hammer-downgrader}/$cache_subdir"
+	[[ -f "$cache_dir/.hammer-stage.json" ]] || die "Staged cache missing: $cache_dir"
+
+	info "Ensuring zipvz payloads …"
+	python3 "$ensure_py" "$cache_dir" || die "ensure-zipvz failed"
+
+	info "Applying downgrade + writing steam.cfg …"
+	warn "Do not start Steam manually until this finishes."
+	if python3 "$apply_py" "$cache_subdir"; then
+		ok "Done — Steam should be build ${STEAM_VERSION} with steam.cfg blocking updates."
+		ok "Open Steam in Desktop Mode to verify."
+	else
+		die "Apply failed — see messages above."
+	fi
+}
+
+main "$@"
