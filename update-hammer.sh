@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# update-hammer.sh — Hammer 1.1.21 for Steam Deck Stable 1794424036.
+# update-hammer.sh — Hammer 1.1.21 (LaunchApp-only / Steamless) for Steam Deck Stable 1794424036.
 # Downloads hammersteam.so, library-inject.so, config.yaml from this branch
 # and forces the 32-bit ubuntu12_32 client (steamrt64 opt-out).
 #
@@ -8,6 +8,12 @@
 #
 # Keep your local config.yaml (only update the .so files):
 #   KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/update-hammer.sh | bash
+#
+# What this build ships:
+#   - ELF32 hammersteam.so MD5 70ea62414ba675cf624f9d4702140a19
+#     (LaunchApp-only AppManager VFT — Steamless path; full VFT suite crashed Steam)
+#   - config.yaml with IClientAppManager::RunIPCFrame unique pattern @ 0x0170d350
+#   - library-inject.so unchanged (fc644f3120d401fefef2d1764f8fa4cd)
 #
 # Older Steam builds — do not use this script:
 #   steam-1791918634 / steam-1792618285 / valveoff-1.5
@@ -18,7 +24,7 @@ REPO_OWNER="dvahana2424-web"
 REPO_NAME="hammerdeckydowngrade"
 BRANCH="steam-1794424036"
 BASE_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}"
-EXPECTED_HAMMER_MD5="8b36458d4a8975e844d61efc13c3b4d4"
+EXPECTED_HAMMER_MD5="70ea62414ba675cf624f9d4702140a19"
 EXPECTED_INJECT_MD5="fc644f3120d401fefef2d1764f8fa4cd"
 
 HAMMER_DIR="${HAMMER_DIR:-$HOME/.local/share/Hammer}"
@@ -104,13 +110,31 @@ force_ubuntu12_client() {
 	info "Equivalent flag: STEAM_FORCE_CLIENT=ubuntu12_32"
 }
 
+verify_config_has_steamless_pattern() {
+	local cfg="$1"
+	if ! grep -q 'IClientAppManager::RunIPCFrame' "$cfg"; then
+		warn "config.yaml missing IClientAppManager::RunIPCFrame — Steamless auto-patch will stay off."
+		return 0
+	fi
+	if grep -q 'IClientAppManager::RunIPCFrame".*"de ad be ef' "$cfg" \
+		|| grep -q 'IClientAppManager::RunIPCFrame: "de ad be ef' "$cfg"; then
+		warn "config.yaml still has dead RunIPCFrame pattern — Steamless will not fire."
+		return 0
+	fi
+	if grep -q '81 ec 80 07 00 00' "$cfg"; then
+		ok "config.yaml has Steamless RunIPCFrame pattern (0x0170d350)."
+	else
+		warn "config.yaml RunIPCFrame pattern may be unexpected — check PatternOverrides."
+	fi
+}
+
 main() {
 	need_cmd mkdir
 	need_cmd chmod
 	need_cmd cp
 	need_cmd date
 
-	info "Hammer 1.1.21 update from ${BASE_URL}"
+	info "Hammer 1.1.21 (LaunchApp-only / Steamless) update from ${BASE_URL}"
 	info "Target Steam: Deck Stable 1794424036 (32-bit ubuntu12_32 client)"
 
 	if steam_running; then
@@ -158,11 +182,12 @@ main() {
 	chmod 0755 "$HAMMER_SO" "$INJECT_SO"
 
 	ok "Installed:"
-	ok "  $HAMMER_SO  (ELF32 MD5 $EXPECTED_HAMMER_MD5)"
+	ok "  $HAMMER_SO  (ELF32 LaunchApp-only MD5 $EXPECTED_HAMMER_MD5)"
 	ok "  $INJECT_SO"
 
 	if [[ -f "$CONFIG_FILE" ]] && [[ "${KEEP_CONFIG:-0}" = "1" ]]; then
 		warn "KEEP_CONFIG=1 — leaving your existing config.yaml untouched."
+		warn "If Steamless is off, set IClientAppManager::RunIPCFrame to the 0x0170d350 pattern."
 	else
 		if [[ -f "$CONFIG_FILE" ]]; then
 			cp -a "$CONFIG_FILE" "$backup_dir/"
@@ -171,6 +196,7 @@ main() {
 		cp -f "$tmp/config.yaml" "$CONFIG_FILE"
 		chmod 0644 "$CONFIG_FILE"
 		ok "  $CONFIG_FILE"
+		verify_config_has_steamless_pattern "$CONFIG_FILE"
 	fi
 	ok "Backups: $backup_dir"
 
@@ -182,7 +208,12 @@ main() {
 	fi
 
 	echo
-	ok "Done. Restart Steam. Confirm ~/.Hammer.log has ubuntu12_32/steamclient.so loaded."
+	ok "Done. Restart Steam."
+	ok "Confirm ~/.Hammer.log has:"
+	ok "  - ubuntu12_32/steamclient.so loaded"
+	ok "  - IClientAppManager::RunIPCFrame NOT 'detour skipped'"
+	ok "  - LaunchApp-only / IClientAppManager::LaunchApp on Play (Steamless)"
+	warn "Do NOT use the old full-VFT SO (MD5 8b36458d…) — it crashes with this pattern."
 }
 
 main "$@"

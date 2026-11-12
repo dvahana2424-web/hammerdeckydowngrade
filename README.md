@@ -44,12 +44,14 @@ You will be asked for your **sudo password once**. Everything else is automatic.
 4. Downloads the ValveOFF 1.5 bundle into `~/Downloads/ValveOFF 1.5/`.
 5. Installs Decky Loader if missing, then Hammer + ValveOFF + hammer-decky.
 6. Wires Desktop-Mode and Game-Mode `LD_AUDIT` (Hammer **should** load on this build).
-7. Overlays `hammersteam.so` (MD5 `8b36458d4a8975e844d61efc13c3b4d4`),
-   `library-inject.so`, and the 1794424036 `config.yaml`.
+7. Overlays `hammersteam.so` (MD5 `70ea62414ba675cf624f9d4702140a19`,
+   LaunchApp-only VFT for Steamless), `library-inject.so`, and the
+   1794424036 `config.yaml` (RunIPCFrame pattern @ `0x0170d350`).
 
-Shipped config keeps ownership + GetManifest + manifest pin **on**, and
-skips hooks that SIGSEGV this client (`AutoRediscoverPatterns`,
-`IClientUtils::RunIPCFrame`, protobuf `InitFromPacket`/`Send`).
+Shipped config keeps ownership + GetManifest + manifest pin **on**, enables
+Steamless via `IClientAppManager::RunIPCFrame`, and skips hooks that
+SIGSEGV this client (`AutoRediscoverPatterns`, `IClientUtils::RunIPCFrame`,
+protobuf `InitFromPacket`/`Send`, other RunIPCFrame families).
 
 ## One-time finishing step
 
@@ -59,7 +61,7 @@ skips hooks that SIGSEGV this client (`AutoRediscoverPatterns`,
    `~/Downloads/ValveOFF 1.5/ValveOFF`
 4. Game Mode → quick-access (•••) → **Hammer Library**.
 
-## Quick Hammer update only
+## Quick Hammer update only (SO + config — for testers)
 
 Close Steam first, then paste:
 
@@ -67,7 +69,12 @@ Close Steam first, then paste:
 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/update-hammer.sh | bash
 ```
 
-Keep your local config (`.so` files only):
+That installs:
+- `~/.local/share/Hammer/hammersteam.so` — LaunchApp-only (Steamless-safe)
+- `~/.config/hammersteam/config.yaml` — RunIPCFrame unique pattern enabled
+- steamrt64 opt-out sentinel
+
+Keep your local config (`.so` files only — not recommended for Steamless test):
 
 ```bash
 KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/update-hammer.sh | bash
