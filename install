@@ -46,7 +46,7 @@ set -uo pipefail
 # Marker so a fresh copy of THIS script does not re-exec into an older pin
 # (that bug made e011b81 bounce to f670e92 and skip LD_AUDIT strip).
 _HAMMERDECK_HAS_STRIP_LD_AUDIT=1
-_INSTALL_PIN="${VALVEOFF_INSTALL_REF:-e011b815494e62906cfb9cc4839b6de4129c0815}"
+_INSTALL_PIN="${VALVEOFF_INSTALL_REF:-34b22e5a6fec7da1a5a55a0349887f7eb68af602}"
 if [ "${VALVEOFF_INSTALL_REV:-}" != "1792618285-steamrt64-v7" ]; then
 	export VALVEOFF_INSTALL_REV=1792618285-steamrt64-v7
 	if [ "${_HAMMERDECK_HAS_STRIP_LD_AUDIT:-0}" = "1" ] && [ "${VALVEOFF_FORCE_REFRESH:-0}" != "1" ]; then
@@ -409,7 +409,7 @@ ensure_steam_target_build() {
 	fi
 
 	local stage_py ensure_py apply_py channel_py base_url pin
-	pin="${VALVEOFF_INSTALL_REF:-${_INSTALL_PIN:-e011b815494e62906cfb9cc4839b6de4129c0815}}"
+	pin="${VALVEOFF_INSTALL_REF:-${_INSTALL_PIN:-34b22e5a6fec7da1a5a55a0349887f7eb68af602}}"
 	# Always fetch helpers from the pinned commit — never the stale branch tip.
 	base_url="https://raw.githubusercontent.com/$REPO/${pin}/steam-cache"
 	tmp="$(mktemp -d "${TMPDIR:-/tmp}/hammer-steam-downgrade.XXXXXX")"
