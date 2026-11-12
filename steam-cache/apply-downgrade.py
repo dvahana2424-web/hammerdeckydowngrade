@@ -137,20 +137,42 @@ def start_package_server(package_dir: Path) -> ThreadingHTTPServer:
     return srv
 
 
-def run_steam_textmode(flavour: str, manifest_name: str, args: list[str]) -> int:
+def resolve_steam_bin(flavour: str) -> list[str]:
+    """Prefer a launcher that does NOT re-export Hammer LD_AUDIT.
+
+    On Steam Deck, `/usr/bin/steam` → `steam-jupiter`, which ValveOFF may patch
+    to `export LD_AUDIT=.../hammersteam.so`. That re-injects 32-bit audit libs
+    into the updater and commonly ends in "Steam needs to be online to update".
+    """
     if flavour == "flatpak":
-        base = ["flatpak", "run", "com.valvesoftware.Steam"]
-    else:
-        base = ["steam"]
+        return ["flatpak", "run", "com.valvesoftware.Steam"]
+
+    candidates = [
+        Path("/usr/lib/steam/steam"),
+        HOME / ".steam" / "steam" / "steam.sh",
+        HOME / ".local" / "share" / "Steam" / "steam.sh",
+    ]
+    for c in candidates:
+        if c.is_file() and os.access(c, os.X_OK):
+            return [str(c)]
+    return ["steam"]
+
+
+def run_steam_textmode(flavour: str, manifest_name: str, args: list[str]) -> int:
+    base = resolve_steam_bin(flavour)
     if flavour == "native" and not manifest_name.startswith("steam_client_steamdeck"):
         base.append("-clearbeta")
-    # Strip Hammer LD_AUDIT — steam inherits it from the Deck environment
-    # and the 32-bit audit shims break textmode update.
+    # Deck /usr/lib/steam/steam expects these; harmless elsewhere.
+    if base and base[0] == "/usr/lib/steam/steam":
+        base = [*base, "-steamdeck", "-pipewire"]
+
     cmd = ["env", "-u", "LD_AUDIT", "-u", "LD_PRELOAD", *base, *args]
     env = os.environ.copy()
     env.pop("LD_AUDIT", None)
     env.pop("LD_PRELOAD", None)
     env["STEAM_FRAME_FORCE_CLOSE"] = "1"
+    # Prevent any wrapper from re-enabling Hammer mid-update.
+    env["LD_AUDIT"] = ""
     info("$ " + " ".join(cmd))
     proc = subprocess.Popen(
         cmd,
@@ -254,29 +276,33 @@ def main() -> int:
     srv = start_package_server(cache_dir)
     try:
         cfg_path = steam_dir / "steam.cfg"
-        cfg_path.write_text(
-            "BootStrapperInhibitAll=enable\n"
-            "BootStrapperForceSelfUpdate=disable\n"
-        )
-        info(f"Wrote {cfg_path}")
+        # Do NOT inhibit updates until AFTER a successful local apply.
+        # With BootStrapperInhibitAll already set, a failed localhost fetch surfaces
+        # as the familiar "Steam needs to be online to update" fatal dialog.
+        with contextlib.suppress(OSError):
+            if cfg_path.exists():
+                cfg_path.unlink()
+                info(f"Removed {cfg_path} for duration of local package apply")
 
         steam_args = [
             "-textmode",
             "-forcesteamupdate",
             "-forcepackagedownload",
             "-overridepackageurl",
-            f"http://localhost:{PACKAGE_PORT}/",
+            f"http://127.0.0.1:{PACKAGE_PORT}/",
             "-exitsteam",
         ]
         info(f"Applying Steam downgrade to v{target_version} …")
+        info(f"Launcher bypasses steam-jupiter (avoids Hammer LD_AUDIT re-export)")
         rc = run_steam_textmode(steam["flavour"], manifest_name, steam_args)
 
-        # Re-assert lock + launcher opt-out after Steam may have rewritten files.
+        # Lock updates + keep steamrt64 launcher opt-out after apply.
         disable_flag.write_text("")
         cfg_path.write_text(
             "BootStrapperInhibitAll=enable\n"
             "BootStrapperForceSelfUpdate=disable\n"
         )
+        info(f"Wrote {cfg_path} (updates locked)")
 
         from steam_channel import pick_active_channel, read_channel_version
 
