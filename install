@@ -41,11 +41,11 @@
 set -uo pipefail
 
 # Re-fetch this script when launched via a stale CDN copy (e.g. old checksum logic).
-# steam-1792618285-install-rev=1792618285-steamrt64-v4
+# steam-1792618285-install-rev=1792618285-steamrt64-v5
 # Pin helpers + install to an immutable commit (branch CDN tips go stale).
 _INSTALL_PIN="${VALVEOFF_INSTALL_REF:-eafdedec58d35b04026bea9b206acd29eac1c393}"
-if [ "${VALVEOFF_INSTALL_REV:-}" != "1792618285-steamrt64-v4" ]; then
-	export VALVEOFF_INSTALL_REV=1792618285-steamrt64-v4
+if [ "${VALVEOFF_INSTALL_REV:-}" != "1792618285-steamrt64-v5" ]; then
+	export VALVEOFF_INSTALL_REV=1792618285-steamrt64-v5
 	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/${_INSTALL_PIN}/install")
 fi
 
