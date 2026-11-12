@@ -9,6 +9,6 @@
 set -uo pipefail
 REPO="${VALVEOFF_REPO:-dvahana2424-web/hammerdeckydowngrade}"
 # Immutable commit with steamrt64 version detection. Do not use branch tip CDNs.
-INSTALL_REF="${VALVEOFF_INSTALL_REF:-784769c1357bed6e56c1ab63152c3abdaa02c237}"
-export VALVEOFF_INSTALL_REV=1792618285-steamrt64-v2
+INSTALL_REF="${VALVEOFF_INSTALL_REF:-e1441ee695707aff1d5df8a1384bba4a78b36e4d}"
+export VALVEOFF_INSTALL_REV=1792618285-steamrt64-v3
 exec bash <(curl -fsSL "https://raw.githubusercontent.com/${REPO}/${INSTALL_REF}/install")
