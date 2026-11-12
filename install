@@ -42,14 +42,19 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
-# Re-fetch this script when launched via a stale CDN copy (e.g. old checksum logic).
-# steam-1792618285-install-rev=1792618285-steamrt64-v5
-# Pin helpers + install to an immutable commit (branch CDN tips go stale).
+# steam-1792618285-install-rev=1792618285-steamrt64-v7
+# Marker so a fresh copy of THIS script does not re-exec into an older pin
+# (that bug made e011b81 bounce to f670e92 and skip LD_AUDIT strip).
+_HAMMERDECK_HAS_STRIP_LD_AUDIT=1
 _INSTALL_PIN="${VALVEOFF_INSTALL_REF:-e011b815494e62906cfb9cc4839b6de4129c0815}"
-# steam-1792618285-install-rev=1792618285-steamrt64-v6
-if [ "${VALVEOFF_INSTALL_REV:-}" != "1792618285-steamrt64-v6" ]; then
-	export VALVEOFF_INSTALL_REV=1792618285-steamrt64-v6
-	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/${_INSTALL_PIN}/install")
+if [ "${VALVEOFF_INSTALL_REV:-}" != "1792618285-steamrt64-v7" ]; then
+	export VALVEOFF_INSTALL_REV=1792618285-steamrt64-v7
+	if [ "${_HAMMERDECK_HAS_STRIP_LD_AUDIT:-0}" = "1" ] && [ "${VALVEOFF_FORCE_REFRESH:-0}" != "1" ]; then
+		# Already running a complete installer body — do not bounce to another commit.
+		:
+	else
+		exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/${_INSTALL_PIN}/install")
+	fi
 fi
 
 # ── Config ──────────────────────────────────────────────────────────────────
@@ -202,9 +207,25 @@ stop_steam() {
 
 # Remove Hammer LD_AUDIT from Deck launchers so textmode downgrade + Steam start
 # are not poisoned by steam-jupiter re-exporting 32-bit audit libs.
+# Rename Hammer audit .so so even a poisoned steam-jupiter LD_AUDIT cannot load them.
+disable_hammer_audit_libs() {
+	local hammer_dir="$HOME_DIR/.local/share/Hammer" f
+	mkdir -p "$hammer_dir"
+	for f in hammersteam.so library-inject.so; do
+		if [ -f "$hammer_dir/$f" ]; then
+			mv -f "$hammer_dir/$f" "$hammer_dir/$f.disabled-downgrade"
+			ok "Disabled $hammer_dir/$f (prevents ELFCLASS32 / SEGV during downgrade)"
+		fi
+	done
+}
+
 strip_hammer_ld_audit() {
 	title "Strip Hammer LD_AUDIT (required for Steam downgrade)"
 	local changed=0 f tmp
+
+	# Always neutralize the .so files first (no sudo needed; works even if
+	# steam-jupiter keep re-exporting LD_AUDIT).
+	disable_hammer_audit_libs
 
 	# Desktop Mode launchers (user-writable).
 	for f in \
@@ -234,17 +255,17 @@ strip_hammer_ld_audit() {
 			/LD_AUDIT=.*Hammer|LD_AUDIT=.*hammersteam|LD_AUDIT=.*library-inject|export LD_AUDIT=.*Hammer/ { next }
 			{ print }
 		' "$f" > "$tmp"
-		if sudo install -m 0755 "$tmp" "$f" 2>/dev/null; then
+		if sudo install -m 0755 "$tmp" "$f"; then
 			ok "Stripped Hammer LD_AUDIT from $f"
 			changed=1
 		else
-			warn "Could not edit $f (sudo/permission) — downgrade may hit ELFCLASS32 / online-update errors."
+			warn "Could not edit $f — Hammer .so already disabled, downgrade can continue."
 		fi
 		rm -f "$tmp"
 	done
 
 	if [ "$changed" = 0 ]; then
-		ok "No Hammer LD_AUDIT left in Steam launchers."
+		ok "Launcher LD_AUDIT clean (or Hammer .so already disabled)."
 	fi
 }
 

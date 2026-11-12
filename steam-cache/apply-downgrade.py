@@ -147,10 +147,11 @@ def resolve_steam_bin(flavour: str) -> list[str]:
     if flavour == "flatpak":
         return ["flatpak", "run", "com.valvesoftware.Steam"]
 
+    # Prefer steam.sh inside the Steam data dir — never /usr/bin/steam (→ steam-jupiter).
     candidates = [
-        Path("/usr/lib/steam/steam"),
         HOME / ".steam" / "steam" / "steam.sh",
         HOME / ".local" / "share" / "Steam" / "steam.sh",
+        Path("/usr/lib/steam/bin_steam.sh"),
     ]
     for c in candidates:
         if c.is_file() and os.access(c, os.X_OK):
@@ -162,18 +163,21 @@ def run_steam_textmode(flavour: str, manifest_name: str, args: list[str]) -> int
     base = resolve_steam_bin(flavour)
     if flavour == "native" and not manifest_name.startswith("steam_client_steamdeck"):
         base.append("-clearbeta")
-    # Deck /usr/lib/steam/steam expects these; harmless elsewhere.
-    if base and base[0] == "/usr/lib/steam/steam":
-        base = [*base, "-steamdeck", "-pipewire"]
 
-    cmd = ["env", "-u", "LD_AUDIT", "-u", "LD_PRELOAD", *base, *args]
-    env = os.environ.copy()
-    env.pop("LD_AUDIT", None)
-    env.pop("LD_PRELOAD", None)
+    # Minimal clean env — do not inherit LD_AUDIT from the parent installer shell.
+    keep = (
+        "HOME", "USER", "LOGNAME", "PATH", "DISPLAY", "WAYLAND_DISPLAY",
+        "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS", "LANG", "LC_ALL",
+        "XAUTHORITY", "STEAM_RUNTIME", "STEAM_RUNTIME_SCOUT",
+    )
+    env = {k: os.environ[k] for k in keep if k in os.environ}
     env["STEAM_FRAME_FORCE_CLOSE"] = "1"
-    # Prevent any wrapper from re-enabling Hammer mid-update.
     env["LD_AUDIT"] = ""
+    env["LD_PRELOAD"] = ""
+
+    cmd = [*base, *args]
     info("$ " + " ".join(cmd))
+    info("(clean env; LD_AUDIT cleared)")
     proc = subprocess.Popen(
         cmd,
         env=env,
