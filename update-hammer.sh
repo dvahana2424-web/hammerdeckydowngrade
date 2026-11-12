@@ -12,7 +12,8 @@
 # What this build ships:
 #   - ELF32 hammersteam.so MD5 70ea62414ba675cf624f9d4702140a19
 #     (LaunchApp-only AppManager VFT — Steamless path; full VFT suite crashed Steam)
-#   - config.yaml with IClientAppManager::RunIPCFrame unique pattern @ 0x0170d350
+#   - config.yaml with verified RunIPCFrame pattern:
+#       "e8 ? ? ? ? 81 c6 ? ? ? ? 53 81 ec 80 07 00 00"  (@ 0x0170d350)
 #   - library-inject.so unchanged (fc644f3120d401fefef2d1764f8fa4cd)
 #
 # Older Steam builds — do not use this script:

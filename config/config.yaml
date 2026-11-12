@@ -1,4 +1,4 @@
-# Hammer config overlay for Steam Deck Stable 1794424036
+# Hammer config overlay for Steam Deck Stable 1794424036 working
 # Verified 2026-11-12: fake ownership (Tunic 553420 Play), GetManifest
 # (Strikers 1279380 via Wudrm), manifest pin (BuildDepotDependency @ 0x11843c0).
 #
@@ -102,7 +102,7 @@ PatternOverrides:
   # IClientUtils::RunIPCFrame was skipped — leftover protobuf/AppManager/ticket detours
   # still call it. UserOwnsDepot stays enabled via UserOwnsDepotPattern below.
   # 1794424036: unique 1-hit @ 0x0170d350 (sub esp,0x780). Needs LaunchApp-only SO (not full VFT suite).
-  "IClientAppManager::RunIPCFrame": "55 89 e5 57 56 e8 ? ? ? ? 81 c6 ? ? ? ? 53 81 ec 80 07 00 00"
+  "IClientAppManager::RunIPCFrame": "e8 ? ? ? ? 81 c6 ? ? ? ? 53 81 ec 80 07 00 00"
   "IClientApps::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
   "IClientRemoteStorage::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
   "IClientUGC::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"

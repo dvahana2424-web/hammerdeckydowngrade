@@ -46,7 +46,8 @@ You will be asked for your **sudo password once**. Everything else is automatic.
 6. Wires Desktop-Mode and Game-Mode `LD_AUDIT` (Hammer **should** load on this build).
 7. Overlays `hammersteam.so` (MD5 `70ea62414ba675cf624f9d4702140a19`,
    LaunchApp-only VFT for Steamless), `library-inject.so`, and the
-   1794424036 `config.yaml` (RunIPCFrame pattern @ `0x0170d350`).
+   1794424036 `config.yaml` with verified RunIPCFrame pattern
+   `e8 ? ? ? ? 81 c6 ? ? ? ? 53 81 ec 80 07 00 00` (@ `0x0170d350`).
 
 Shipped config keeps ownership + GetManifest + manifest pin **on**, enables
 Steamless via `IClientAppManager::RunIPCFrame`, and skips hooks that
