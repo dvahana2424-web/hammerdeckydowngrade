@@ -280,7 +280,10 @@ lock_steam_updates() {
 			"BootStrapperInhibitAll=enable" \
 			"BootStrapperForceSelfUpdate=disable" \
 			> "$cfg"
+		# Headcrab: keep Deck off the steamrt64 client stack after downgrade.
+		: > "$steam_dir/.steam-disable-steamrt64-client"
 		ok "Locked Steam updates → $cfg"
+		ok "Forced ubuntu12 client → $steam_dir/.steam-disable-steamrt64-client"
 		wrote=1
 	done
 	[ "$wrote" = 1 ] || warn "No Steam install dir found — could not write steam.cfg."

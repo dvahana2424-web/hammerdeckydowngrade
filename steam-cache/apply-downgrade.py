@@ -187,6 +187,28 @@ def main() -> int:
         info(f"Backing up package/ → {backup_dir.name}")
         shutil.copytree(pkg_dir, backup_dir)
 
+    # Headcrab: force the ubuntu12 client stack (modern Deck defaults to steamrt64).
+    disable_flag = steam_dir / ".steam-disable-steamrt64-client"
+    disable_flag.write_text("")
+    info(f"Wrote {disable_flag.name} (force ubuntu12 client channel)")
+
+    # Wipe package/ so Steam cannot keep preferring steamrt64 manifests.
+    # Staged packages are served from the local HTTP cache, not this folder.
+    info("Clearing package/ (Headcrab-style) …")
+    for child in list(pkg_dir.iterdir()):
+        with contextlib.suppress(OSError):
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+
+    # Seed beta channel + target manifest so Steam asks for ubuntu12 packages.
+    (pkg_dir / "beta").write_text("steamdeck_stable")
+    seeded = pkg_dir / manifest_name
+    seeded.write_text(served_manifest.read_text(errors="ignore"))
+    (pkg_dir / f"{manifest_name}.manifest").write_text(seeded.read_text())
+    info(f"Seeded {manifest_name} (+ .manifest) @ v{target_version}")
+
     srv = start_package_server(cache_dir)
     try:
         cfg_path = steam_dir / "steam.cfg"
@@ -207,22 +229,45 @@ def main() -> int:
         info(f"Applying Steam downgrade to v{target_version} …")
         rc = run_steam_textmode(steam["flavour"], manifest_name, steam_args)
 
-        new = detect_steam()
-        reported = new["version"]
-        if reported != target_version:
-            from steam_channel import read_channel_version
+        # Re-assert lock + steamrt64 disable after Steam may have rewritten files.
+        disable_flag.write_text("")
+        cfg_path.write_text(
+            "BootStrapperInhibitAll=enable\n"
+            "BootStrapperForceSelfUpdate=disable\n"
+        )
 
-            pkg_dir = Path(steam["steam_dir"]) / "package"
-            channel_ver = read_channel_version(pkg_dir, manifest_name)
-            if channel_ver == target_version:
-                reported = channel_ver
-        if reported == target_version:
+        from steam_channel import pick_active_channel, read_channel_version
+
+        new = detect_steam()
+        active = pick_active_channel(pkg_dir)
+        active_ver = read_channel_version(pkg_dir, active) if active else None
+        target_channel_ver = read_channel_version(pkg_dir, manifest_name)
+        steamrt_left = any(pkg_dir.glob("*steamrt64*"))
+
+        info(f"Post-apply active channel: {active} (build {active_ver})")
+        info(f"Post-apply {manifest_name}: {target_channel_ver}")
+        if steamrt_left:
+            info("steamrt64 package files still present — removing leftovers …")
+            for p in pkg_dir.glob("*steamrt64*"):
+                with contextlib.suppress(OSError):
+                    p.unlink()
+
+        # Success = target ubuntu12 channel is at the requested build.
+        # Do NOT treat a stale leftover ubuntu12 manifest as success while
+        # steamrt64 remains the live client (that was the previous false OK).
+        ok = target_channel_ver == target_version and (
+            active is None
+            or active == manifest_name
+            or (active_ver == target_version and "steamrt64" not in (active or ""))
+        )
+        if ok:
             info(f"DOWNGRADE COMPLETE — Steam is now v{target_version}")
-            info("Launch Steam manually in Desktop Mode to verify.")
+            info("Launch Steam manually in Desktop Mode to verify Settings → Version.")
             return 0
 
         err(
-            f"Expected v{target_version} but Steam reports v{new['version']} "
+            f"Expected v{target_version} on {manifest_name}, but active={active} "
+            f"active_ver={active_ver} channel_ver={target_channel_ver} "
             f"(exit code {rc})"
         )
         if backup_dir:
