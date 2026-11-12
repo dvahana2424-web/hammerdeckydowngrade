@@ -101,8 +101,8 @@ PatternOverrides:
   # Crash remains FakeAppIds::getRealAppIdForCurrentPipe (eax=0xfffff374) even after
   # IClientUtils::RunIPCFrame was skipped — leftover protobuf/AppManager/ticket detours
   # still call it. UserOwnsDepot stays enabled via UserOwnsDepotPattern below.
-  # 1794424036: 1 hit @ vaddr 0x0170d350 — enables LaunchApp/Steamless (verified on ubuntu12_32).
-  "IClientAppManager::RunIPCFrame": "e8 ? ? ? ? 81 c6 ? ? ? ? 53 81 ec 80 07 00 00"
+  # 1794424036: unique 1-hit @ 0x0170d350 crashed Steam (VFT LaunchApp/InstallState). Keep skipped.
+  "IClientAppManager::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
   "IClientApps::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
   "IClientRemoteStorage::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
   "IClientUGC::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
