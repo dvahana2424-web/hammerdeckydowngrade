@@ -1,14 +1,15 @@
 valveoff_version=1.5
-build_date=2026-10-14
+build_date=2026-11-12
 bundle_sha256=ee3f3279188e6ad56f2321b5da15d45df2bde5f0898c25011820f933ef0d1bc2
-config_rev=5
-hammer_version=1.1.18
+config_rev=1794424036
+hammer_version=1.1.21
 hammer_codename=manifest-stack
 hammer_decky_version=0.9.24
-hammersteam_bytes=17137724
-hammersteam_md5=190f96360917aaf8584e69536704c2a0
+hammersteam_bytes=17138568
+hammersteam_md5=8b36458d4a8975e844d61efc13c3b4d4
 library_inject_bytes=26540
 library_inject_md5=fc644f3120d401fefef2d1764f8fa4cd
-steam_client_build=1791918634
-manifest_chain=manifest-stack->lua/wudrm/manifestdex->archive->extended:zipball/mirror/worker/localcache
-notes=Steam 1791918634 overlay: ValveOFF 1.5 bundle + Hammer 1.1.18 (protobuf layout auto-detect for achievements/tickets, GetSubscribedApps re-pinned) + config.yaml
+steam_client_build=1794424036
+steam_beta_branch=Steam Deck Stable
+steam_client_path=ubuntu12_32
+notes=Steam Deck Stable 1794424036 overlay: ValveOFF 1.5 bundle + Hammer 1.1.21 ELF32 (GetManifest Shape A + manifest pin) + config.yaml. Forces .steam-disable-steamrt64-client (STEAM_FORCE_CLIENT=ubuntu12_32). Does not downgrade Steam. Does not lock steam.cfg. Does not strip LD_AUDIT.

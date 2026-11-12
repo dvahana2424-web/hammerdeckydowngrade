@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Steam client 1792618285 — downgrade + lock + ValveOFF + Hammer (one paste).
-# Does not replace steam-1791918634. That command stays:
+# Steam Deck Stable 1794424036 — Hammer 1.1.21 one-paste.
+# Does NOT replace older commands. Those stay:
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
 #   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/bootstrap | bash
-#
-# This build (Headcrab-compatible client 1792618285):
 #   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1792618285/bootstrap | bash
+#
+# This build (stay on 1794424036, force ubuntu12_32, install working Hammer):
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/bootstrap | bash
 #
 set -uo pipefail
 REPO="${VALVEOFF_REPO:-dvahana2424-web/hammerdeckydowngrade}"
-# Immutable commit with steamrt64 version detection. Do not use branch tip CDNs.
-INSTALL_REF="${VALVEOFF_INSTALL_REF:-34b22e5a6fec7da1a5a55a0349887f7eb68af602}"
-export VALVEOFF_INSTALL_REV=1792618285-steamrt64-v7
-exec bash <(curl -fsSL "https://raw.githubusercontent.com/${REPO}/${INSTALL_REF}/install")
+BRANCH="${VALVEOFF_BRANCH:-steam-1794424036}"
+export VALVEOFF_INSTALL_REV=1794424036-ubuntu12-v1
+exec bash <(curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/install?ts=$(date +%s)")

@@ -1,39 +1,38 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-#  ValveOFF 1.5 — ONE-PASTE installer (SteamOS / Bazzite / any Linux)
+#  ValveOFF 1.5 — ONE-PASTE installer for Steam Deck Stable 1794424036
 #
 #  Usage (Desktop Mode → Konsole, do NOT run as root):
 #
-#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1792618285/bootstrap | bash
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/bootstrap | bash
 #
 #  Prefer `bootstrap` over `install` directly — GitHub raw CDN can serve a stale
-#  `install` copy for several minutes after an update (checksum / logic fixes).
+#  `install` copy for several minutes after an update.
 #
-#  Steam 1792618285 (this branch), fully automatic after one sudo prompt:
-#    strip Hammer LD_AUDIT from steam-jupiter/desktop → Headcrab downgrade +
-#    steam.cfg lock → ValveOFF + Hammer files → strip LD_AUDIT again (Steam
-#    must start; Hammer patterns still target 1791918634). Older builds:
-#    steam-1791918634/bootstrap | bash
-#  ValveOFF 1.5 only (no downgrade):
+#  This branch STAYS on Steam 1794424036 (no downgrade, no steam.cfg lock).
+#  It forces the 32-bit ubuntu12_32 client because 1794424036 defaults to
+#  steamrt64 (ELF64) and ELF32 Hammer is ignored there (ELFCLASS32).
+#  Hammer 1.1.21 + 1794424036 config ARE loaded (LD_AUDIT is kept ON).
+#
+#  Older commands are unchanged:
 #    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/bootstrap | bash
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1792618285/bootstrap | bash
 #
 #  ValveOFF 1.4 (unchanged — do NOT use this branch for 1.4):
 #    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install | bash
 #
 #  What this does, fully automatic, ONE sudo password prompt:
 #    1. Detects the host (SteamOS / Bazzite / generic Linux).
-#    2. Detects installed Steam build; if not 1792618285, Headcrab-style downgrade
-#       from Valve CDN, then steam.cfg lock (no auto-update).
-#    3. SMART CLEANUP of any previous OneTap / SLSsteam install:
-#         • removes its Desktop-Mode unlock (.desktop + LD_AUDIT wrappers)
-#         • removes its Game-Mode unlock (LD_AUDIT in steam-jupiter / steam)
-#         • deletes steam.cfg  → re-enables Steam auto-update
-#         • removes ~/.local/share/SLSsteam and ~/.config/SLSsteam
+#    2. SMART CLEANUP of any previous OneTap / SLSsteam install
+#       (also deletes steam.cfg so Steam auto-update stays on).
+#    3. Writes ~/.local/share/Steam/.steam-disable-steamrt64-client
+#       (same as STEAM_FORCE_CLIENT=ubuntu12_32).
 #    4. Downloads the ValveOFF bundle into your Downloads folder.
 #    5. Installs Decky Loader (latest) if it isn't already present.
 #    6. Installs Hammer + ValveOFF + hammer-decky and wires Desktop-Mode unlock.
 #    7. Applies Game-Mode unlock (steam-jupiter on SteamOS, /usr/local/bin/steam
-#       wrapper on Bazzite/atomic).
+#       wrapper on Bazzite/atomic). LD_AUDIT stays ON.
 #    8. Overlays hammersteam.so, library-inject.so, and config.yaml from this
 #       branch. The rest of the bundle still comes from valveoff-1.5.
 #
@@ -42,29 +41,24 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
-# steam-1792618285-install-rev=1792618285-steamrt64-v7
-# Marker so a fresh copy of THIS script does not re-exec into an older pin
-# (that bug made e011b81 bounce to f670e92 and skip LD_AUDIT strip).
-_HAMMERDECK_HAS_STRIP_LD_AUDIT=1
-_INSTALL_PIN="${VALVEOFF_INSTALL_REF:-34b22e5a6fec7da1a5a55a0349887f7eb68af602}"
-if [ "${VALVEOFF_INSTALL_REV:-}" != "1792618285-steamrt64-v7" ]; then
-	export VALVEOFF_INSTALL_REV=1792618285-steamrt64-v7
-	if [ "${_HAMMERDECK_HAS_STRIP_LD_AUDIT:-0}" = "1" ] && [ "${VALVEOFF_FORCE_REFRESH:-0}" != "1" ]; then
-		# Already running a complete installer body — do not bounce to another commit.
-		:
-	else
-		exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/${_INSTALL_PIN}/install")
-	fi
+# steam-1794424036-install-rev=1794424036-ubuntu12-v1
+# Do not bounce to steam-1792618285 / Headcrab pins — this branch must keep
+# Hammer LD_AUDIT on and must not downgrade Steam.
+_INSTALL_PIN="${VALVEOFF_INSTALL_REF:-steam-1794424036}"
+if [ "${VALVEOFF_INSTALL_REV:-}" != "1794424036-ubuntu12-v1" ]; then
+	export VALVEOFF_INSTALL_REV=1794424036-ubuntu12-v1
 fi
 
 # ── Config ──────────────────────────────────────────────────────────────────
 # ValveOFF 1.5 branch — separate from main (ValveOFF 1.4). Do not point 1.4
 # installs here; use `main` for 1.4.
 REPO="dvahana2424-web/hammerdeckydowngrade"
-BRANCH="steam-1792618285"
-TARGET_STEAM_BUILD=1792618285
-# SteamTracking commit where ClientManifest/steam_client_ubuntu12 == 1792618285
-STEAM_TRACKING_SHA="${STEAM_TRACKING_SHA:-5ac8059e326268232f8bf80ba49e75d9cea69ed5}"
+BRANCH="steam-1794424036"
+TARGET_STEAM_BUILD=1794424036
+EXPECTED_HAMMER_MD5="${EXPECTED_HAMMER_MD5:-8b36458d4a8975e844d61efc13c3b4d4}"
+EXPECTED_INJECT_MD5="${EXPECTED_INJECT_MD5:-fc644f3120d401fefef2d1764f8fa4cd}"
+# Unused on this branch (no Steam downgrade). Kept so SKIP helpers still parse.
+STEAM_TRACKING_SHA="${STEAM_TRACKING_SHA:-}"
 STEAM_DOWNGRADE_PARALLEL="${STEAM_DOWNGRADE_PARALLEL:-4}"
 # Bundle parts stay on valveoff-1.5. This branch only replaces the .so files
 # and config.yaml after that download.
@@ -270,7 +264,7 @@ strip_hammer_ld_audit() {
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
-#  STEAM DOWNGRADE (Headcrab-compatible build) + steam.cfg lock
+#  STEAM BUILD DETECT + ubuntu12_32 opt-out (no downgrade on this branch)
 # ═════════════════════════════════════════════════════════════════════════════
 resolve_steam_package_dir() {
 	local d
@@ -343,30 +337,40 @@ steam_client_running() {
 	return 1
 }
 
-lock_steam_updates() {
-	local steam_dir cfg wrote=0
+force_ubuntu12_client() {
+	title "Force 32-bit ubuntu12_32 client (Steam $TARGET_STEAM_BUILD defaults to steamrt64)"
+	local steam_dir wrote=0 seen=""
+	info "Equivalent flag: STEAM_FORCE_CLIENT=ubuntu12_32"
 	for steam_dir in \
+		"$HOME_DIR/.local/share/Steam" \
 		"$HOME_DIR/.steam/steam" \
+		"$HOME_DIR/.steam/root" \
+		"$HOME_DIR/.var/app/com.valvesoftware.Steam/.local/share/Steam" \
 		"$HOME_DIR/.var/app/com.valvesoftware.Steam/.steam/steam"; do
 		[ -d "$steam_dir" ] || continue
-		cfg="$steam_dir/steam.cfg"
-		printf '%s\n' \
-			"BootStrapperInhibitAll=enable" \
-			"BootStrapperForceSelfUpdate=disable" \
-			> "$cfg"
-		# Headcrab: keep Deck off the steamrt64 client stack after downgrade.
+		# Skip duplicate paths that resolve to the same directory.
+		local real
+		real="$(readlink -f "$steam_dir" 2>/dev/null || echo "$steam_dir")"
+		case " $seen " in
+			*" $real "*) continue ;;
+		esac
+		seen="$seen $real"
 		: > "$steam_dir/.steam-disable-steamrt64-client"
-		ok "Locked Steam updates → $cfg"
-		ok "Forced ubuntu12 client → $steam_dir/.steam-disable-steamrt64-client"
+		ok "Opted out of steamrt64 → $steam_dir/.steam-disable-steamrt64-client"
 		wrote=1
 	done
-	[ "$wrote" = 1 ] || warn "No Steam install dir found — could not write steam.cfg."
+	if [ "$wrote" = 0 ]; then
+		mkdir -p "$HOME_DIR/.local/share/Steam"
+		: > "$HOME_DIR/.local/share/Steam/.steam-disable-steamrt64-client"
+		ok "Opted out of steamrt64 → $HOME_DIR/.local/share/Steam/.steam-disable-steamrt64-client"
+	fi
 }
 
+# 1794424036 path: stay on the installed Steam Deck Stable client.
+# Do not Headcrab-downgrade. Do not write steam.cfg (auto-update stays on).
 ensure_steam_target_build() {
-	title "Steam client → build $TARGET_STEAM_BUILD (Headcrab-compatible)"
-	local current="" cache_subdir cache_dir tmp pkg active
-	tmp=""
+	title "Steam client → stay on Deck Stable $TARGET_STEAM_BUILD (no downgrade)"
+	local current="" pkg active
 	pkg="$(resolve_steam_package_dir 2>/dev/null || true)"
 	active=""
 	if [ -n "$pkg" ]; then
@@ -377,110 +381,22 @@ ensure_steam_target_build() {
 		info "Active Steam channel: $active"
 	fi
 	if [ -n "$current" ]; then
-		info "Detected Steam client build: $current (matches Settings UI when channel is current)"
+		info "Detected Steam client build: $current"
+		if [ "$current" = "$TARGET_STEAM_BUILD" ]; then
+			ok "Steam is already build $TARGET_STEAM_BUILD."
+		else
+			warn "Installed build is $current, not $TARGET_STEAM_BUILD."
+			warn "This installer does not downgrade. Update Steam to Deck Stable 1794424036, or use steam-1792618285 / steam-1791918634."
+		fi
 	else
 		warn "Could not read installed Steam build from package/*.manifest"
+		warn "Continuing — Hammer overlay + ubuntu12_32 sentinel will still be applied."
 	fi
 	if [ -n "$active" ] && [[ "$active" == *"_steamrt64" ]]; then
-		warn "steamrt64 client detected — downgrade will use Headcrab ubuntu12 manifest stack."
+		warn "steamrt64 channel is active — ELF32 Hammer cannot inject there."
+		warn "Writing .steam-disable-steamrt64-client so the next Steam start uses ubuntu12_32."
 	fi
-
-	if [ "$current" = "$TARGET_STEAM_BUILD" ]; then
-		ok "Steam is already build $TARGET_STEAM_BUILD."
-		lock_steam_updates
-		return 0
-	fi
-
-	if [ "${SKIP_STEAM_DOWNGRADE:-0}" = "1" ]; then
-		warn "SKIP_STEAM_DOWNGRADE=1 — skipping downgrade (target $TARGET_STEAM_BUILD)."
-		lock_steam_updates
-		return 0
-	fi
-
-	command -v python3 >/dev/null 2>&1 \
-		|| die "python3 is required to downgrade Steam to build $TARGET_STEAM_BUILD."
-
-	if steam_client_running; then
-		stop_steam
-		sleep 1
-	fi
-	if steam_client_running; then
-		die "Steam is still running — close it fully (steam -shutdown), then re-run."
-	fi
-
-	local stage_py ensure_py apply_py channel_py base_url pin
-	pin="${VALVEOFF_INSTALL_REF:-${_INSTALL_PIN:-34b22e5a6fec7da1a5a55a0349887f7eb68af602}}"
-	# Always fetch helpers from the pinned commit — never the stale branch tip.
-	base_url="https://raw.githubusercontent.com/$REPO/${pin}/steam-cache"
-	tmp="$(mktemp -d "${TMPDIR:-/tmp}/hammer-steam-downgrade.XXXXXX")"
-	stage_py="$tmp/stage-build.py"
-	ensure_py="$tmp/ensure-zipvz.py"
-	apply_py="$tmp/apply-downgrade.py"
-	channel_py="$tmp/steam_channel.py"
-
-	info "Downloading downgrade helpers from $base_url …"
-	if ! curl -fsSL --retry 3 --retry-delay 2 -o "$stage_py" "$base_url/stage-build.py"; then
-		rm -rf "$tmp"
-		die "Could not download stage-build.py"
-	fi
-	if ! curl -fsSL --retry 3 --retry-delay 2 -o "$ensure_py" "$base_url/ensure-zipvz.py"; then
-		rm -rf "$tmp"
-		die "Could not download ensure-zipvz.py"
-	fi
-	if ! curl -fsSL --retry 3 --retry-delay 2 -o "$apply_py" "$base_url/apply-downgrade.py"; then
-		rm -rf "$tmp"
-		die "Could not download apply-downgrade.py"
-	fi
-	if ! curl -fsSL --retry 3 --retry-delay 2 -o "$channel_py" "$base_url/steam_channel.py"; then
-		rm -rf "$tmp"
-		die "Could not download steam_channel.py"
-	fi
-	chmod +x "$stage_py" "$ensure_py" "$apply_py"
-
-	warn "Downgrading Steam ($current → $TARGET_STEAM_BUILD). Large CDN download — please wait."
-	info "Staging packages (parallel=$STEAM_DOWNGRADE_PARALLEL) …"
-	if ! cache_subdir="$(
-		( cd "$tmp" && python3 "$stage_py" \
-			--version "$TARGET_STEAM_BUILD" \
-			--sha "$STEAM_TRACKING_SHA" \
-			--parallel "$STEAM_DOWNGRADE_PARALLEL" )
-	)"; then
-		rm -rf "$tmp"
-		die "Steam package staging failed."
-	fi
-	if [ -z "$cache_subdir" ]; then
-		rm -rf "$tmp"
-		die "Staging returned empty cache id."
-	fi
-
-	cache_dir="${HOME_DIR}/.cache/hammer-downgrader/${cache_subdir}"
-	if [ ! -f "$cache_dir/.hammer-stage.json" ]; then
-		rm -rf "$tmp"
-		die "Staged cache missing: $cache_dir"
-	fi
-
-	info "Preparing zipvz payloads …"
-	if ! ( cd "$tmp" && python3 "$ensure_py" "$cache_dir" ); then
-		rm -rf "$tmp"
-		die "ensure-zipvz failed."
-	fi
-
-	warn "Applying downgrade via local package server + steam.cfg lock …"
-	warn "Do not start Steam manually until this step finishes."
-	if ! ( cd "$tmp" && python3 "$apply_py" "$cache_subdir" ); then
-		rm -rf "$tmp"
-		die "Steam downgrade apply step failed."
-	fi
-	rm -rf "$tmp"
-
-	current="$(read_installed_steam_build 2>/dev/null || true)"
-	if [ "$current" = "$TARGET_STEAM_BUILD" ]; then
-		ok "Steam is now build $TARGET_STEAM_BUILD with steam.cfg blocking auto-update."
-	else
-		warn "Downgrade finished but package manifest shows: ${current:-unknown}"
-		warn "Open Steam once in Desktop Mode to verify, then re-run if needed."
-	fi
-	lock_steam_updates
+	force_ubuntu12_client
 	return 0
 }
 
@@ -755,6 +671,24 @@ refresh_hammer_from_github() {
 
 	[[ "$(wc -c < "$tmp/hammersteam.so")" -gt 1000000 ]] \
 		|| { rm -rf "$tmp"; warn "hammersteam.so too small — skipping refresh."; return 1; }
+	if ! file "$tmp/hammersteam.so" 2>/dev/null | grep -q 'ELF 32-bit'; then
+		rm -rf "$tmp"
+		warn "hammersteam.so is not ELF32 — refusing overlay (steamrt64 ELF64 is not the user path)."
+		return 1
+	fi
+	local got_md5
+	got_md5="$(md5sum "$tmp/hammersteam.so" 2>/dev/null | awk '{print $1}')"
+	if [ -n "$EXPECTED_HAMMER_MD5" ] && [ "$got_md5" != "$EXPECTED_HAMMER_MD5" ]; then
+		rm -rf "$tmp"
+		warn "hammersteam.so MD5 $got_md5 != $EXPECTED_HAMMER_MD5 — skipping refresh."
+		return 1
+	fi
+	got_md5="$(md5sum "$tmp/library-inject.so" 2>/dev/null | awk '{print $1}')"
+	if [ -n "$EXPECTED_INJECT_MD5" ] && [ "$got_md5" != "$EXPECTED_INJECT_MD5" ]; then
+		rm -rf "$tmp"
+		warn "library-inject.so MD5 $got_md5 != $EXPECTED_INJECT_MD5 — skipping refresh."
+		return 1
+	fi
 
 	mkdir -p "$backup_dir"
 	for f in "$hammer_dir/hammersteam.so" "$hammer_dir/library-inject.so"; do
@@ -789,7 +723,11 @@ refresh_hammer_from_github() {
 	rm -rf "$tmp"
 
 	# Best-effort version stamp for the install log.
-	if strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.17"; then
+	if [ "$(md5sum "$hammer_dir/hammersteam.so" 2>/dev/null | awk '{print $1}')" = "$EXPECTED_HAMMER_MD5" ]; then
+		ok "Installed Hammer 1.1.21 (1794424036 / ELF32 MD5 $EXPECTED_HAMMER_MD5) → $hammer_dir/"
+	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.21"; then
+		ok "Installed Hammer 1.1.21 (manifest-stack) → $hammer_dir/"
+	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.17"; then
 		ok "Installed Hammer 1.1.17 (manifest-stack) → $hammer_dir/"
 	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.16"; then
 		ok "Installed Hammer 1.1.16 (manifest-stack) → $hammer_dir/"
@@ -899,7 +837,7 @@ apply_gamemode_unlock() {
 #  MAIN
 # ═════════════════════════════════════════════════════════════════════════════
 main() {
-	title "ValveOFF 1.5 one-paste installer (Steam $TARGET_STEAM_BUILD)"
+	title "ValveOFF 1.5 + Hammer 1.1.21 (Steam Deck Stable $TARGET_STEAM_BUILD)"
 	info "User: $USER_NAME    Home: $HOME_DIR"
 	info "Downloads: $DL_DIR"
 	detect_distro
@@ -907,10 +845,9 @@ main() {
 
 	smart_cleanup
 	stop_steam
-	# Must run before downgrade: steam-jupiter re-exports Hammer LD_AUDIT and
-	# breaks textmode local package apply ("needs to be online" / ELFCLASS32).
-	strip_hammer_ld_audit
-	ensure_steam_target_build || die "Steam downgrade step failed."
+	# Stay on 1794424036. Force ubuntu12_32. Do NOT strip LD_AUDIT — Hammer
+	# 1.1.21 + this config are the working path for this client.
+	ensure_steam_target_build || die "ubuntu12_32 client opt-out failed."
 	download_bundle
 	install_decky
 	install_core
@@ -918,22 +855,21 @@ main() {
 	overlay_hammer_decky_in_bundle
 	install_hammer_decky_from_bundle
 	apply_gamemode_unlock
-	# ValveOFF gamemode-install re-wires LD_AUDIT — strip again so Steam can
-	# actually start on 1792618285 (current Hammer patterns are for 1791918634).
-	strip_hammer_ld_audit
 	relock_rootfs
 
 	title "${C_B}DONE${C_RST}"
 	cat <<EOF
 
-  Steam should be build ${TARGET_STEAM_BUILD} (locked via steam.cfg).
+  Steam Deck Stable ${TARGET_STEAM_BUILD} — Hammer 1.1.21 ELF32 installed.
+  steamrt64 is opted out via .steam-disable-steamrt64-client
+  (same as STEAM_FORCE_CLIENT=ubuntu12_32). steam.cfg was NOT locked.
 
-  ${C_B}1.${C_RST} Launch Steam in Desktop Mode and confirm Settings → Version.
-  ${C_B}2.${C_RST} Run ValveOFF once to activate your license:
+  ${C_B}1.${C_RST} Launch Steam in Desktop Mode. Settings → Version should be ${TARGET_STEAM_BUILD}.
+  ${C_B}2.${C_RST} Confirm ~/.Hammer.log has:  steamclient.so loaded from ubuntu12_32
+  ${C_B}3.${C_RST} Run ValveOFF once to activate your license:
          "$DEST/ValveOFF"
-  ${C_B}3.${C_RST} Hammer .so/config are installed, but LD_AUDIT was left OFF on
-       this branch so Steam does not SEGV (Hammer still tuned for 1791918634).
-       hammer-decky is installed for when Hammer hooks are retargeted.
+  ${C_B}4.${C_RST} Ownership + GetManifest + manifest pin are ON in config.yaml.
+       Do not enable AutoRediscoverPatterns on this client.
 
   Bundle / re-run / uninstall:
        cd "$DEST"

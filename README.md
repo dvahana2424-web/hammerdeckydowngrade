@@ -1,183 +1,87 @@
-# Steam 1791918634 — one-paste install
+# Steam Deck Stable 1794424036 — one-paste install
 
 Works on **SteamOS (Steam Deck)**, **Bazzite**, and most other Linux distros.
 
-This branch pins Hammer for Steam client build **1791918634**. It still downloads
-the ValveOFF 1.5 bundle (Decky, hammer-decky, unlock scripts), then replaces
-`hammersteam.so`, `library-inject.so`, and `config.yaml` with the copies on
-this branch.
+This branch pins Hammer **1.1.21** for Steam client build **1794424036**
+(Steam Deck Stable). It still downloads the ValveOFF 1.5 bundle (Decky,
+hammer-decky, unlock scripts), then replaces `hammersteam.so`,
+`library-inject.so`, and `config.yaml` with the copies on this branch.
 
-The older command is unchanged on `valveoff-1.5`:
+1794424036 defaults to the **64-bit** SteamRT3 client (`steamrt64/steam`).
+ELF32 Hammer is ignored there (`ELFCLASS32`). This installer opts out of
+that client so the working 32-bit path is used:
+
+```text
+touch ~/.local/share/Steam/.steam-disable-steamrt64-client
+# equivalent: STEAM_FORCE_CLIENT=ubuntu12_32
+```
+
+It does **not** downgrade Steam and does **not** write `steam.cfg`.
+
+Older commands are unchanged:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/bootstrap | bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1792618285/bootstrap | bash
 ```
 
-## Install (Steam 1791918634)
+## Install (Steam 1794424036)
 
 Open **Konsole** in Desktop Mode (as your normal user, *not* root) and paste:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/bootstrap | bash
-```
-
-Or directly:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/install | bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/bootstrap | bash
 ```
 
 You will be asked for your **sudo password once**. Everything else is automatic.
 
-## Uninstall (ValveOFF 1.5)
-
-Close Steam first, then paste:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/uninstall | bash
-```
-
-Removes Hammer + ValveOFF + hammer-decky + unlock hooks. Config is kept unless `REMOVE_CONFIG=1`.
-
 ## What it does
 
 1. Detects your host (SteamOS / Bazzite / generic Linux).
-2. **Smart cleanup of any old OneTap / SLSsteam install:**
-   - removes its Desktop-Mode unlock (`.desktop` + `LD_AUDIT` wrappers),
-   - removes its Game-Mode unlock (`LD_AUDIT` in `steam-jupiter` / `steam`),
-   - deletes `steam.cfg` so **Steam auto-update is re-enabled**,
-   - removes `~/.local/share/SLSsteam` and `~/.config/SLSsteam`.
-3. Downloads the ValveOFF 1.5 bundle into your **Downloads** folder
-   (`~/Downloads/ValveOFF 1.5/`).
-4. Installs **Decky Loader (latest)** if it isn't already present.
-5. Installs **Hammer + ValveOFF + hammer-decky** and wires the Desktop-Mode unlock.
-6. Applies the **Game-Mode unlock** (`steam-jupiter` patch on SteamOS,
-   `/usr/local/bin/steam` wrapper on Bazzite/atomic).
-7. Overlays `hammersteam.so`, `library-inject.so`, and `config.yaml` from this branch (Steam **1791918634**, Hammer **1.1.18**).
+2. Cleans old OneTap / SLSsteam unlocks if present (re-enables Steam auto-update).
+3. Writes `.steam-disable-steamrt64-client` so Steam uses `ubuntu12_32/steam`.
+4. Downloads the ValveOFF 1.5 bundle into `~/Downloads/ValveOFF 1.5/`.
+5. Installs Decky Loader if missing, then Hammer + ValveOFF + hammer-decky.
+6. Wires Desktop-Mode and Game-Mode `LD_AUDIT` (Hammer **should** load on this build).
+7. Overlays `hammersteam.so` (MD5 `8b36458d4a8975e844d61efc13c3b4d4`),
+   `library-inject.so`, and the 1794424036 `config.yaml`.
+
+Shipped config keeps ownership + GetManifest + manifest pin **on**, and
+skips hooks that SIGSEGV this client (`AutoRediscoverPatterns`,
+`IClientUtils::RunIPCFrame`, protobuf `InitFromPacket`/`Send`).
 
 ## One-time finishing step
 
-1. Launch Steam in Desktop Mode (let it update if it wants — that's fine).
-2. Run ValveOFF once to activate your license:
-   `~/Downloads/ValveOFF 1.5/ValveOFF` (or from the KDE menu).
-3. Game Mode → quick-access (•••) → **Hammer Library**.
+1. Launch Steam in Desktop Mode. Confirm Settings → Version is **1794424036**.
+2. Confirm `~/.Hammer.log` has `ubuntu12_32/steamclient.so loaded`.
+3. Run ValveOFF once to activate your license:
+   `~/Downloads/ValveOFF 1.5/ValveOFF`
+4. Game Mode → quick-access (•••) → **Hammer Library**.
 
-## Manage it
-
-```bash
-cd "$HOME/Downloads/ValveOFF 1.5"
-./install.sh status       # what's installed
-./install.sh verify       # did Hammer load in Desktop Mode?
-./install.sh uninstall    # remove everything (keeps config)
-```
-
-## Quick Hammer update (Steam 1791918634)
+## Quick Hammer update only
 
 Close Steam first, then paste:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/update-hammer.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/update-hammer.sh | bash
 ```
-
-Updates:
-- `bin/hammersteam.so` → `~/.local/share/Hammer/hammersteam.so`
-- `bin/library-inject.so` → `~/.local/share/Hammer/library-inject.so`
-- `config/config.yaml` → `~/.config/hammersteam/config.yaml`
 
 Keep your local config (`.so` files only):
 
 ```bash
-KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/bootstrap | bash
+KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/update-hammer.sh | bash
 ```
 
-Or on an existing install:
+## Uninstall
 
 ```bash
-KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/update-hammer.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/uninstall | bash
 ```
 
-## Update hammer-decky plugin only
+To go back to the 64-bit SteamRT3 client later:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/update-hammer-decky.sh | bash
-```
-
-## Self-hosting the bundle
-
-The bundle ships as split raw files on
-[`valveoff-1.5`](https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/valveoff-1.5)
-(`valveoff-bundle.tar.gz.00.part`, `…01.part`, `…sha256`). The installer
-concatenates the parts, verifies the SHA256, then overlays `hammersteam.so`,
-`library-inject.so`, and `config.yaml` from `steam-1791918634`.
-
-```bash
-VALVEOFF_BUNDLE_URL=https://example.com/valveoff-bundle.tar.gz \
-  curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/install | bash
-```
-
----
-
-## ValveOFF 1.4 (unchanged on `main`)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/install | bash
-```
-
-Hammer update for 1.4:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer.sh | bash
-```
-
----
-
-# hammerdeckydowngrade — branch `valveoff-1.5`
-
-**Public distribution repo only** — binaries, config, install scripts, and Steam
-downgrade cache. No application source code lives on this branch.
-
-Repository: [dvahana2424-web/hammerdeckydowngrade](https://github.com/dvahana2424-web/hammerdeckydowngrade)
-
-## Contents (1.5)
-
-- **hammersteam.so** — Hammer **1.1.18** manifest-stack (1.1.17 + protobuf layout auto-detect for achievements/tickets on Steam 1791918634)
-- **library-inject.so** — small audit helper that loads hammersteam.so
-- **config.yaml** — Sep 2026 offsets (`0x12e27b0` / `0x17cc990`), manifest-stack + manifest-pin for Steam build `1788652215`
-- **ValveOFF 1.5** — obfuscated binary with manifest pin UI
-
-See `VERSION.txt` for build metadata.
-
-## Manual install
-
-```bash
-mkdir -p ~/.local/share/Hammer ~/.config/hammersteam
-cp bin/hammersteam.so ~/.local/share/Hammer/
-cp bin/library-inject.so ~/.local/share/Hammer/
-cp config/config.yaml ~/.config/hammersteam/
-chmod 755 ~/.local/share/Hammer/*.so
-```
-
-Restart Steam after updating.
-
-## Steam downgrade only — Headcrab build `1788652215` (no SLSsteam)
-
-Close Steam first. Downloads the client from Valve’s CDN, downgrades via local
-package server (same idea as [headcrab.sh](https://raw.githubusercontent.com/Deadboy666/h3adcr-b/refs/heads/main/headcrab.sh)), writes `steam.cfg` so Steam does not auto-update, and does **not** install SLSsteam or patch `steam.sh`.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap-downgrade | bash
-```
-
-Direct script (may hit GitHub raw CDN cache right after an update):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/headcrab-downgrade-only | bash
-```
-
-## Steam downgrade (older build 1781041600)
-
-Pre-staged cache on GitHub — shared `steam-cache/`:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/downgrade-steam | bash
+STEAM_FORCE_CLIENT=steamrt64 steam
+# or: rm ~/.local/share/Steam/.steam-disable-steamrt64-client
 ```

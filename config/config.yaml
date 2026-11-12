@@ -1,4 +1,15 @@
-DisableFamilyShareLock: yes
+# Hammer config overlay for Steam Deck Stable 1794424036
+# Verified 2026-11-12: fake ownership (Tunic 553420 Play), GetManifest
+# (Strikers 1279380 via Wudrm), manifest pin (BuildDepotDependency @ 0x11843c0).
+#
+# Requires ELF32 hammersteam.so AND the 32-bit client:
+#   touch ~/.local/share/Steam/.steam-disable-steamrt64-client
+#   # or: STEAM_FORCE_CLIENT=ubuntu12_32
+# Copy over ~/.config/hammersteam/config.yaml and restart Steam.
+# See progressreport.txt (top) for the full flag table.
+#
+# 1794424036: FamilyGroup retn patches can land on the wrong fn after the client shift.
+DisableFamilyShareLock: no
 
 DepotResponsePatchEnabled: yes
 DepotResponsePatchBypassAuthFailures: yes
@@ -39,10 +50,12 @@ FakeWalletBalance: 0
 Hammerlog: 2
 ExtendedLogging: yes
 
+# 1794424036: unique RPC LEA to ContentServerDirectory.GetManifestRequestCode#1.
+# Real entry is Shape A PIC at vaddr 0x1505200 (inner 55 89 e5 is +10).
+# Keep protobuf InitFromPacket skipped — that was the 15:26 SIGSEGV.
 ManifestHookEnabled: yes
-ManifestPattern: "e8 ? ? ? ? 05 ? ? ? ? 55 89 e5 57 56 53 81 ec 20 01 00"
-# Pinned for steamclient build 1791918634 (Oct 13 2026) via hammer-pattern-scanner.
-GetManifestRequestCodeOffset: 0x14e9f80
+ManifestPattern: "e8 ? ? ? ? 05 ? ? ? ? 55 89 e5 57 56 53 81 ec 20 01 00 00 8b 7d 08 8b 4d 20"
+GetManifestRequestCodeOffset: 0x1505200
 ManifestProvider: Wudrm
 ManifestFallbackProvider: yes
 ManifestLocalCacheFallback: no
@@ -79,19 +92,45 @@ BBuildAndAsyncSendFrameOffset: 0
 RecvPktOffset: 0
 
 AllowMissingPatterns: yes
+# 1794424036: auto-rediscover hooked IClientUser::RunIPCFrame onto a 194KB
+# function (fnSize=194240). That detour segfaults steam (pid 138118) ~5s after
+# load() during the library-nudge ticket drain. Skip recovery; miss → skip hook.
+AutoRediscoverPatterns: no
 PatternOverrides:
-  # Oct 13 2026 client: old push-0x990 signature is gone. This hit is unique and
-  # sits immediately after the 55 89 e5 57 56 prologue of the AppManager dispatcher.
-  # Without it, LaunchApp is never hooked and Steamless never runs.
-  "IClientAppManager::RunIPCFrame": "e8 ? ? ? ? 81 c6 ? ? ? ? 53 81 ec 80 07 00 00"
-  "IClientApps::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d ca 9c 88 a6"
-  "IClientRemoteStorage::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 65 dd 12 87"
-  "IClientUGC::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 56 0c d2 71"
-  "IClientUserStats::RunIPCFrame": "e8 ? ? ? ? 8b 85 ? ? ? ? 83 c4 10 3d 6b d6 e5 85"
+  # Impossible signatures: skip stale 1791918634 hooks so Steam UI can boot on 1794424036.
+  # Crash remains FakeAppIds::getRealAppIdForCurrentPipe (eax=0xfffff374) even after
+  # IClientUtils::RunIPCFrame was skipped — leftover protobuf/AppManager/ticket detours
+  # still call it. UserOwnsDepot stays enabled via UserOwnsDepotPattern below.
+  "IClientAppManager::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
+  "IClientApps::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
+  "IClientRemoteStorage::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
+  "IClientUGC::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
+  "IClientUserStats::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
+  "IClientUtils::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
+  "IClientUser::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
+  "IClientAppManager::BCanRemotePlayTogether": "de ad be ef 00 11 22 33 44 55 66 77"
+  # Unique on 1794424036 (1 hit). Needed for library owned/PURCHASE; does not call FakeAppIds.
   "CUser::GetSubscribedApps": "e8 ? ? ? ? 89 c7 83 c4 10 85 c0 74 ? 8b 5d ? 39 d8 7e"
-  "CAPIJob::GetPlayerStats": "e8 ? ? ? ? 83 c4 10 89 c5 e9 ? ? ? ? ? ?"
-  "BBuildAndAsyncSendFrame": "55 89 e5 57 e8 ? ? ? ? 81 c7 ? ? ? ? 56 53 81 ec ac 00 00 00 8b"
-  "RecvPkt": "55 89 e5 57 56 e8 ? ? ? ? 81 c6 ? ? ? ? 53 83 ec 1c 8b 86 ? ?"
+  "CUser::CheckAppOwnership": "e8 ? ? ? ? 88 45 ? 83 c4 10 84 c0 0f 84 ? ? ? ? 8b 45 ? 80 7d ? 00"
+  "CAPIJob::GetPlayerStats": "de ad be ef 00 11 22 33 44 55 66 77"
+  "CSteamEngine::SetAppIdForCurrentPipe": "de ad be ef 00 11 22 33 44 55 66 77"
+  # 1794424036 crash: InitFromPacket → Achievements/NetPacketUserStats
+  # cmpl $0x15,-0xc(%eax) with eax=0 (CrashID bp-22bfd2b7-…).
+  "CProtoBufMsgBase::InitFromPacket": "de ad be ef 00 11 22 33 44 55 66 77"
+  "CProtoBufMsgBase::Send": "de ad be ef 00 11 22 33 44 55 66 77"
+  "IClientUser::BLoggedOn": "de ad be ef 00 11 22 33 44 55 66 77"
+  "IClientUser::BUpdateAppOwnershipTicket": "de ad be ef 00 11 22 33 44 55 66 77"
+  "IClientUser::GetAppOwnershipTicketExtendedData": "de ad be ef 00 11 22 33 44 55 66 77"
+  "IClientUser::IsUserSubscribedAppInTicket": "de ad be ef 00 11 22 33 44 55 66 77"
+  "IClientUser::GetSteamID": "de ad be ef 00 11 22 33 44 55 66 77"
+  "IClientUser::UpdateAppOwnershipTicket": "de ad be ef 00 11 22 33 44 55 66 77"
+  "CSteamEngine::PostCallback": "de ad be ef 00 11 22 33 44 55 66 77"
+  "CSteamMatchmakingServers::GetServerDetails": "de ad be ef 00 11 22 33 44 55 66 77"
+  "ISteamMatchmakingPingResponse::ServerResponded": "de ad be ef 00 11 22 33 44 55 66 77"
+  "FamilyGroupRunningApp": "de ad be ef 00 11 22 33 44 55 66 77"
+  "StopPlayingBorrowedApp": "de ad be ef 00 11 22 33 44 55 66 77"
+  "BBuildAndAsyncSendFrame": "de ad be ef 00 11 22 33 44 55 66 77"
+  "RecvPkt": "de ad be ef 00 11 22 33 44 55 66 77"
 
 CloudSaveEnabled: yes
 CloudSaveProvider: gdrive
@@ -102,10 +141,11 @@ CloudSaveSyncAchievements: no
 CloudSaveSyncPlaytime: no
 CloudSaveStorageSubdir: hammer_cloud_save
 CloudSaveGDriveRoot: HammerCloudSave
-# ELF vaddr of the "BuildDepotDependency" string-xref function (Oct 13 2026 client).
-# Offset is base+vaddr, not vaddr-0x10000 — the smaller value landed on a bad prologue.
-# Pattern left empty so a 4-hit prologue scan cannot hook the wrong function.
+# 1794424036: unique "BuildDepotDependency" string (1 LEA) → vaddr 0x11843c0
+# (55 89 e5 57 56 e8 … add esi,GOT). Pin Diner Bros 2 3253150 depot 3253151
+# to .hammer setManifestid gid=7965747117527358690 (Steam used live
+# 4762027129901590213 without this hook).
 ManifestPinEnabled: yes
 ManifestPinDisabledApps: [678950, 1803140]
-BuildDepotDependencyOffset: 0x11781b0
-BuildDepotDependencyPattern: ""
+BuildDepotDependencyOffset: 0x11843c0
+BuildDepotDependencyPattern: "55 89 e5 57 56 e8 ? ? ? ? 81 c6 ? ? ? ? 53 81 ec 2c 02 00 00 8b 45 08"

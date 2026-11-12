@@ -1,26 +1,25 @@
 #!/usr/bin/env bash
-# update-hammer.sh — download latest hammersteam.so, library-inject.so, config.yaml
-# from GitHub (steam-1791918634 branch) and install to standard Hammer paths.
-#
-# Upload newer files to:
-#   https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/steam-1791918634/bin
-#   https://github.com/dvahana2424-web/hammerdeckydowngrade/tree/steam-1791918634/config
+# update-hammer.sh — Hammer 1.1.21 for Steam Deck Stable 1794424036.
+# Downloads hammersteam.so, library-inject.so, config.yaml from this branch
+# and forces the 32-bit ubuntu12_32 client (steamrt64 opt-out).
 #
 # One-paste update (close Steam first):
-#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/update-hammer.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/update-hammer.sh | bash
 #
 # Keep your local config.yaml (only update the .so files):
-#   KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/update-hammer.sh | bash
+#   KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/update-hammer.sh | bash
 #
-# ValveOFF 1.4 (main branch — unchanged):
-#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/main/update-hammer.sh | bash
+# Older Steam builds — do not use this script:
+#   steam-1791918634 / steam-1792618285 / valveoff-1.5
 #
 set -euo pipefail
 
 REPO_OWNER="dvahana2424-web"
 REPO_NAME="hammerdeckydowngrade"
-BRANCH="steam-1791918634"
+BRANCH="steam-1794424036"
 BASE_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}"
+EXPECTED_HAMMER_MD5="8b36458d4a8975e844d61efc13c3b4d4"
+EXPECTED_INJECT_MD5="fc644f3120d401fefef2d1764f8fa4cd"
 
 HAMMER_DIR="${HAMMER_DIR:-$HOME/.local/share/Hammer}"
 
@@ -73,10 +72,36 @@ download() {
 	[[ -s "$dest" ]] || die "Download failed or empty: $url"
 }
 
+file_md5() {
+	md5sum "$1" 2>/dev/null | awk '{print $1}'
+}
+
 steam_running() {
 	pgrep -x steam >/dev/null 2>&1 \
 		|| pgrep -x steamwebhelper >/dev/null 2>&1 \
 		|| pgrep -f '[s]team -srt' >/dev/null 2>&1
+}
+
+force_ubuntu12_client() {
+	local steam_dir wrote=0
+	info "Opting out of steamrt64 (1794424036 defaults to ELF64 SteamRT3) …"
+	for steam_dir in \
+		"$HOME/.local/share/Steam" \
+		"$HOME/.steam/steam" \
+		"$HOME/.steam/root" \
+		"$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam" \
+		"$HOME/.var/app/com.valvesoftware.Steam/.steam/steam"; do
+		[ -d "$steam_dir" ] || continue
+		: > "$steam_dir/.steam-disable-steamrt64-client"
+		ok "Forced ubuntu12_32 → $steam_dir/.steam-disable-steamrt64-client"
+		wrote=1
+	done
+	if [ "$wrote" = 0 ]; then
+		mkdir -p "$HOME/.local/share/Steam"
+		: > "$HOME/.local/share/Steam/.steam-disable-steamrt64-client"
+		ok "Forced ubuntu12_32 → $HOME/.local/share/Steam/.steam-disable-steamrt64-client"
+	fi
+	info "Equivalent flag: STEAM_FORCE_CLIENT=ubuntu12_32"
 }
 
 main() {
@@ -85,7 +110,8 @@ main() {
 	need_cmd cp
 	need_cmd date
 
-	info "Hammer update from ${BASE_URL}"
+	info "Hammer 1.1.21 update from ${BASE_URL}"
+	info "Target Steam: Deck Stable 1794424036 (32-bit ubuntu12_32 client)"
 
 	if steam_running; then
 		warn "Steam appears to be running."
@@ -102,11 +128,18 @@ main() {
 	download "${BASE_URL}/bin/library-inject.so" "$tmp/library-inject.so"
 	download "${BASE_URL}/config/config.yaml"   "$tmp/config.yaml"
 
-	# Basic sanity checks
 	[[ "$(wc -c < "$tmp/hammersteam.so")" -gt 1000000 ]] \
 		|| die "hammersteam.so looks too small — aborting."
-	file "$tmp/hammersteam.so" 2>/dev/null | grep -qi 'ELF' \
-		|| die "hammersteam.so is not an ELF file — aborting."
+	file "$tmp/hammersteam.so" 2>/dev/null | grep -q 'ELF 32-bit' \
+		|| die "hammersteam.so is not ELF32 — refusing to install (steamrt64 ELF64 Hammer is not the user path)."
+
+	local got
+	got="$(file_md5 "$tmp/hammersteam.so")"
+	[[ "$got" = "$EXPECTED_HAMMER_MD5" ]] \
+		|| die "hammersteam.so MD5 $got != $EXPECTED_HAMMER_MD5 — aborting."
+	got="$(file_md5 "$tmp/library-inject.so")"
+	[[ "$got" = "$EXPECTED_INJECT_MD5" ]] \
+		|| die "library-inject.so MD5 $got != $EXPECTED_INJECT_MD5 — aborting."
 
 	local stamp backup_dir
 	stamp="$(date +%Y%m%d-%H%M%S)"
@@ -125,10 +158,9 @@ main() {
 	chmod 0755 "$HAMMER_SO" "$INJECT_SO"
 
 	ok "Installed:"
-	ok "  $HAMMER_SO"
+	ok "  $HAMMER_SO  (ELF32 MD5 $EXPECTED_HAMMER_MD5)"
 	ok "  $INJECT_SO"
 
-	# config.yaml — always update from GitHub (with backup). Set KEEP_CONFIG=1 to skip.
 	if [[ -f "$CONFIG_FILE" ]] && [[ "${KEEP_CONFIG:-0}" = "1" ]]; then
 		warn "KEEP_CONFIG=1 — leaving your existing config.yaml untouched."
 	else
@@ -142,13 +174,15 @@ main() {
 	fi
 	ok "Backups: $backup_dir"
 
+	force_ubuntu12_client
+
 	if download "${BASE_URL}/VERSION.txt" "$tmp/VERSION.txt" 2>/dev/null; then
 		info "Package version:"
 		cat "$tmp/VERSION.txt"
 	fi
 
 	echo
-	ok "Done. Restart Steam to load the new hammersteam.so."
+	ok "Done. Restart Steam. Confirm ~/.Hammer.log has ubuntu12_32/steamclient.so loaded."
 }
 
 main "$@"
