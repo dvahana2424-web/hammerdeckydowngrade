@@ -43,28 +43,16 @@ def detect_steam() -> dict[str, Any]:
         return {"flavour": None, "steam_dir": None, "version": None}
 
     pkg_dir = steam_dir / "package"
-    version = None
-    for name in (
-        "steam_client_steamdeck_stable_ubuntu12",
-        "steam_client_steamdeck_publicbeta_ubuntu12",
-        "steam_client_ubuntu12",
-        "steam_client_publicbeta_ubuntu12",
-    ):
-        manifest = pkg_dir / f"{name}.manifest"
-        if manifest.exists():
-            try:
-                txt = manifest.read_text(errors="ignore")
-                m = re.search(r'"version"\s*"(\d+)"', txt)
-                if m:
-                    version = m.group(1)
-            except OSError:
-                pass
-            break
+    from steam_channel import pick_active_channel, read_channel_version
+
+    active = pick_active_channel(pkg_dir)
+    version = read_channel_version(pkg_dir, active) if active else None
 
     return {
         "flavour": flavour,
         "steam_dir": str(steam_dir),
         "version": version,
+        "active_channel": active,
         "steam_cfg_path": str(steam_dir / "steam.cfg"),
     }
 
@@ -220,7 +208,15 @@ def main() -> int:
         rc = run_steam_textmode(steam["flavour"], manifest_name, steam_args)
 
         new = detect_steam()
-        if new["version"] == target_version:
+        reported = new["version"]
+        if reported != target_version:
+            from steam_channel import read_channel_version
+
+            pkg_dir = Path(steam["steam_dir"]) / "package"
+            channel_ver = read_channel_version(pkg_dir, manifest_name)
+            if channel_ver == target_version:
+                reported = channel_ver
+        if reported == target_version:
             info(f"DOWNGRADE COMPLETE — Steam is now v{target_version}")
             info("Launch Steam manually in Desktop Mode to verify.")
             return 0

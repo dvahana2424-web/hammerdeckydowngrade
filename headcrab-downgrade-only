@@ -80,14 +80,16 @@ main() {
 	tmp="$(mktemp -d "${TMPDIR:-/tmp}/headcrab-downgrade.XXXXXX")"
 	trap 'rm -rf "$tmp"' EXIT
 
-	local stage_py ensure_py apply_py
+	local stage_py ensure_py apply_py channel_py
 	stage_py="$tmp/stage-build.py"
 	ensure_py="$tmp/ensure-zipvz.py"
 	apply_py="$tmp/apply-downgrade.py"
+	channel_py="$tmp/steam_channel.py"
 
 	download "${BASE_URL}/steam-cache/stage-build.py" "$stage_py"
 	download "${BASE_URL}/steam-cache/ensure-zipvz.py" "$ensure_py"
 	download "${BASE_URL}/steam-cache/apply-downgrade.py" "$apply_py"
+	download "${BASE_URL}/steam-cache/steam_channel.py" "$channel_py"
 	chmod +x "$stage_py" "$ensure_py" "$apply_py"
 
 	if [[ "$SKIP_STAGE" == "1" ]]; then
@@ -97,10 +99,10 @@ main() {
 	else
 		info "Staging client packages from Valve CDN (this may take a while) …"
 		cache_subdir="$(
-			python3 "$stage_py" \
+			( cd "$tmp" && python3 "$stage_py" \
 				--version "$STEAM_VERSION" \
 				--sha "$STEAM_TRACKING_SHA" \
-				--parallel "$PARALLEL"
+				--parallel "$PARALLEL" )
 		)" || die "Staging failed"
 		[[ -n "$cache_subdir" ]] || die "Staging did not return cache id"
 	fi
@@ -109,11 +111,11 @@ main() {
 	[[ -f "$cache_dir/.hammer-stage.json" ]] || die "Staged cache missing: $cache_dir"
 
 	info "Ensuring zipvz payloads …"
-	python3 "$ensure_py" "$cache_dir" || die "ensure-zipvz failed"
+	( cd "$tmp" && python3 "$ensure_py" "$cache_dir" ) || die "ensure-zipvz failed"
 
 	info "Applying downgrade + writing steam.cfg …"
 	warn "Do not start Steam manually until this finishes."
-	if python3 "$apply_py" "$cache_subdir"; then
+	if ( cd "$tmp" && python3 "$apply_py" "$cache_subdir" ); then
 		ok "Done — Steam should be build ${STEAM_VERSION} with steam.cfg blocking updates."
 		ok "Open Steam in Desktop Mode to verify."
 	else

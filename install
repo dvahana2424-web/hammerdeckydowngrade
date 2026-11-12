@@ -210,25 +210,48 @@ resolve_steam_package_dir() {
 	return 1
 }
 
-read_installed_steam_build() {
-	local pkg name manifest ver
-	pkg="$(resolve_steam_package_dir)" || return 1
-	for name in \
-		steam_client_steamdeck_stable_ubuntu12 \
-		steam_client_steamdeck_publicbeta_ubuntu12 \
-		steam_client_ubuntu12 \
-		steam_client_publicbeta_ubuntu12; do
-		manifest="$pkg/${name}.manifest"
-		if [ -f "$manifest" ]; then
-			ver="$(grep -m1 '"version"' "$manifest" \
-				| sed -n 's/.*"version"[[:space:]]*"\([0-9][0-9]*\)".*/\1/p')"
-			if [ -n "$ver" ]; then
-				echo "$ver"
-				return 0
+# Must match steam-cache/steam_channel.py MANIFEST_CANDIDATES (newest .installed/.manifest wins).
+_STEAM_PKG_CHANNELS=(
+	steam_client_steamdeck_stable_steamrt64
+	steam_client_steamdeck_publicbeta_steamrt64
+	steam_client_steamdeck_stable_ubuntu12
+	steam_client_steamdeck_publicbeta_ubuntu12
+	steam_client_ubuntu12
+	steam_client_publicbeta_ubuntu12
+)
+
+pick_active_steam_channel() {
+	local pkg="$1" name best="" best_mtime=0 mtime f
+	for name in "${_STEAM_PKG_CHANNELS[@]}"; do
+		for f in "$pkg/${name}.installed" "$pkg/${name}.manifest"; do
+			if [ -f "$f" ]; then
+				mtime="$(stat -c %Y "$f" 2>/dev/null || echo 0)"
+				if [ "$mtime" -gt "$best_mtime" ]; then
+					best_mtime="$mtime"
+					best="$name"
+				fi
+				break
 			fi
-		fi
+		done
 	done
-	return 1
+	[ -n "$best" ] && echo "$best"
+}
+
+read_version_from_pkg_manifest() {
+	local manifest="$1" ver
+	[ -f "$manifest" ] || return 1
+	ver="$(grep -m1 '"version"' "$manifest" \
+		| sed -n 's/.*"version"[[:space:]]*"\([0-9][0-9]*\)".*/\1/p')"
+	[ -n "$ver" ] || return 1
+	echo "$ver"
+}
+
+read_installed_steam_build() {
+	local pkg active manifest ver
+	pkg="$(resolve_steam_package_dir)" || return 1
+	active="$(pick_active_steam_channel "$pkg")" || return 1
+	manifest="$pkg/${active}.manifest"
+	read_version_from_pkg_manifest "$manifest"
 }
 
 steam_client_running() {
@@ -263,13 +286,24 @@ lock_steam_updates() {
 
 ensure_steam_target_build() {
 	title "Steam client → build $TARGET_STEAM_BUILD (Headcrab-compatible)"
-	local current="" cache_subdir cache_dir tmp
+	local current="" cache_subdir cache_dir tmp pkg active
 	tmp=""
+	pkg="$(resolve_steam_package_dir 2>/dev/null || true)"
+	active=""
+	if [ -n "$pkg" ]; then
+		active="$(pick_active_steam_channel "$pkg" 2>/dev/null || true)"
+	fi
 	current="$(read_installed_steam_build 2>/dev/null || true)"
+	if [ -n "$active" ]; then
+		info "Active Steam channel: $active"
+	fi
 	if [ -n "$current" ]; then
-		info "Detected Steam client build: $current"
+		info "Detected Steam client build: $current (matches Settings UI when channel is current)"
 	else
 		warn "Could not read installed Steam build from package/*.manifest"
+	fi
+	if [ -n "$active" ] && [[ "$active" == *"_steamrt64" ]]; then
+		warn "steamrt64 client detected — downgrade will use Headcrab ubuntu12 manifest stack."
 	fi
 
 	if [ "$current" = "$TARGET_STEAM_BUILD" ]; then
@@ -295,12 +329,13 @@ ensure_steam_target_build() {
 		die "Steam is still running — close it fully (steam -shutdown), then re-run."
 	fi
 
-	local stage_py ensure_py apply_py base_url
+	local stage_py ensure_py apply_py channel_py base_url
 	base_url="$BRANCH_RAW_BASE/steam-cache"
 	tmp="$(mktemp -d "${TMPDIR:-/tmp}/hammer-steam-downgrade.XXXXXX")"
 	stage_py="$tmp/stage-build.py"
 	ensure_py="$tmp/ensure-zipvz.py"
 	apply_py="$tmp/apply-downgrade.py"
+	channel_py="$tmp/steam_channel.py"
 
 	info "Downloading downgrade helpers from $base_url …"
 	if ! curl -fsSL --retry 3 --retry-delay 2 -o "$stage_py" "$base_url/stage-build.py"; then
@@ -315,15 +350,19 @@ ensure_steam_target_build() {
 		rm -rf "$tmp"
 		die "Could not download apply-downgrade.py"
 	fi
+	if ! curl -fsSL --retry 3 --retry-delay 2 -o "$channel_py" "$base_url/steam_channel.py"; then
+		rm -rf "$tmp"
+		die "Could not download steam_channel.py"
+	fi
 	chmod +x "$stage_py" "$ensure_py" "$apply_py"
 
 	warn "Downgrading Steam ($current → $TARGET_STEAM_BUILD). Large CDN download — please wait."
 	info "Staging packages (parallel=$STEAM_DOWNGRADE_PARALLEL) …"
 	if ! cache_subdir="$(
-		python3 "$stage_py" \
+		( cd "$tmp" && python3 "$stage_py" \
 			--version "$TARGET_STEAM_BUILD" \
 			--sha "$STEAM_TRACKING_SHA" \
-			--parallel "$STEAM_DOWNGRADE_PARALLEL"
+			--parallel "$STEAM_DOWNGRADE_PARALLEL" )
 	)"; then
 		rm -rf "$tmp"
 		die "Steam package staging failed."
@@ -340,14 +379,14 @@ ensure_steam_target_build() {
 	fi
 
 	info "Preparing zipvz payloads …"
-	if ! python3 "$ensure_py" "$cache_dir"; then
+	if ! ( cd "$tmp" && python3 "$ensure_py" "$cache_dir" ); then
 		rm -rf "$tmp"
 		die "ensure-zipvz failed."
 	fi
 
 	warn "Applying downgrade via local package server + steam.cfg lock …"
 	warn "Do not start Steam manually until this step finishes."
-	if ! python3 "$apply_py" "$cache_subdir"; then
+	if ! ( cd "$tmp" && python3 "$apply_py" "$cache_subdir" ); then
 		rm -rf "$tmp"
 		die "Steam downgrade apply step failed."
 	fi

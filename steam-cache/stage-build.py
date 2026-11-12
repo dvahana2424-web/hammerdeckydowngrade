@@ -23,18 +23,11 @@ CACHE_ROOT = HOME / ".cache" / "hammer-downgrader"
 STEAM_CDN = "http://media.steampowered.com/client/"
 ST_REPO_RAW = "https://raw.githubusercontent.com/SteamTracking/SteamTracking"
 
-LOCAL_TO_UPSTREAM = {
-    "steam_client_steamdeck_stable_ubuntu12": "steam_client_ubuntu12",
-    "steam_client_steamdeck_publicbeta_ubuntu12": "steam_client_publicbeta_ubuntu12",
-    "steam_client_ubuntu12": "steam_client_ubuntu12",
-    "steam_client_publicbeta_ubuntu12": "steam_client_publicbeta_ubuntu12",
-}
-
-MANIFEST_CANDIDATES = (
-    "steam_client_steamdeck_stable_ubuntu12",
-    "steam_client_steamdeck_publicbeta_ubuntu12",
-    "steam_client_ubuntu12",
-    "steam_client_publicbeta_ubuntu12",
+from steam_channel import (
+    LOCAL_TO_UPSTREAM,
+    downgrade_manifest_name,
+    pick_active_channel,
+    read_channel_version,
 )
 
 
@@ -55,18 +48,16 @@ def detect_steam() -> dict:
         return {"flavour": None, "steam_dir": None, "manifest_name": None}
 
     pkg_dir = steam_dir / "package"
-    manifest_name = None
-    for name in MANIFEST_CANDIDATES:
-        if (pkg_dir / f"{name}.manifest").exists() or (pkg_dir / f"{name}.installed").exists():
-            manifest_name = name
-            break
-    if manifest_name is None:
-        manifest_name = MANIFEST_CANDIDATES[0]
+    active = pick_active_channel(pkg_dir)
+    manifest_name = downgrade_manifest_name(active)
+    active_version = read_channel_version(pkg_dir, active) if active else None
 
     return {
         "flavour": flavour,
         "steam_dir": str(steam_dir),
         "manifest_name": manifest_name,
+        "active_channel": active,
+        "active_version": active_version,
     }
 
 
@@ -132,7 +123,12 @@ def main() -> int:
     cache_dir = cache_dir_for(manifest_name, args.sha)
 
     info(f"Target build: {args.version}")
-    info(f"Channel: {manifest_name} (upstream: {upstream})")
+    if steam.get("active_channel"):
+        info(
+            f"Active install: {steam['active_channel']} "
+            f"(build {steam.get('active_version') or '?'})"
+        )
+    info(f"Downgrade channel: {manifest_name} (upstream: {upstream})")
     info(f"Cache: {cache_dir}")
 
     manifest_url = f"{ST_REPO_RAW}/{args.sha}/ClientManifest/{upstream}"
@@ -185,6 +181,8 @@ def main() -> int:
         "staged_at": dt.datetime.now().isoformat(timespec="seconds"),
         "steam_flavour": steam["flavour"],
         "steam_dir": steam["steam_dir"],
+        "active_channel": steam.get("active_channel"),
+        "active_version": steam.get("active_version"),
     }
     (cache_dir / ".hammer-stage.json").write_text(json.dumps(meta, indent=2))
     info(f"STAGE OK — cache subdir: {cache_dir.name}")
