@@ -4,12 +4,15 @@
 #
 #  Usage (Desktop Mode → Konsole, do NOT run as root):
 #
-#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/bootstrap | bash
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1792618285/bootstrap | bash
 #
 #  Prefer `bootstrap` over `install` directly — GitHub raw CDN can serve a stale
 #  `install` copy for several minutes after an update (checksum / logic fixes).
 #
-#  Steam 1791918634 (this branch). The older ValveOFF 1.5 command is unchanged:
+#  Steam 1792618285 (this branch): checks your client, Headcrab-style downgrade if
+#  needed, locks updates via steam.cfg, then ValveOFF + Hammer. Older builds:
+#    steam-1791918634/bootstrap | bash
+#  ValveOFF 1.5 only (no downgrade):
 #    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
 #
 #  ValveOFF 1.4 (unchanged — do NOT use this branch for 1.4):
@@ -17,19 +20,20 @@
 #
 #  What this does, fully automatic, ONE sudo password prompt:
 #    1. Detects the host (SteamOS / Bazzite / generic Linux).
-#    2. SMART CLEANUP of any previous OneTap / SLSsteam install:
+#    2. Detects installed Steam build; if not 1792618285, Headcrab-style downgrade
+#       from Valve CDN, then steam.cfg lock (no auto-update).
+#    3. SMART CLEANUP of any previous OneTap / SLSsteam install:
 #         • removes its Desktop-Mode unlock (.desktop + LD_AUDIT wrappers)
 #         • removes its Game-Mode unlock (LD_AUDIT in steam-jupiter / steam)
 #         • deletes steam.cfg  → re-enables Steam auto-update
 #         • removes ~/.local/share/SLSsteam and ~/.config/SLSsteam
-#    3. Downloads the ValveOFF bundle into your Downloads folder.
-#    4. Installs Decky Loader (latest) if it isn't already present.
-#    5. Installs Hammer + ValveOFF + hammer-decky and wires Desktop-Mode unlock.
-#    6. Applies Game-Mode unlock (steam-jupiter on SteamOS, /usr/local/bin/steam
+#    4. Downloads the ValveOFF bundle into your Downloads folder.
+#    5. Installs Decky Loader (latest) if it isn't already present.
+#    6. Installs Hammer + ValveOFF + hammer-decky and wires Desktop-Mode unlock.
+#    7. Applies Game-Mode unlock (steam-jupiter on SteamOS, /usr/local/bin/steam
 #       wrapper on Bazzite/atomic).
-#    7. Overlays hammersteam.so, library-inject.so, and config.yaml pinned for
-#       Steam client build 1791918634 (this branch). The rest of the bundle
-#       still comes from valveoff-1.5.
+#    8. Overlays hammersteam.so, library-inject.so, and config.yaml from this
+#       branch. The rest of the bundle still comes from valveoff-1.5.
 #
 #  Override the bundle source if you self-host:
 #    VALVEOFF_BUNDLE_URL=https://example/valveoff-bundle.tar.gz curl ... | bash
@@ -37,17 +41,21 @@
 set -uo pipefail
 
 # Re-fetch this script when launched via a stale CDN copy (e.g. old checksum logic).
-# steam-1791918634-install-rev=1791918634
-if [ "${VALVEOFF_INSTALL_REV:-}" != "1791918634" ]; then
-	export VALVEOFF_INSTALL_REV=1791918634
-	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/install?rev=1791918634&ts=$(date +%s)")
+# steam-1792618285-install-rev=1792618285
+if [ "${VALVEOFF_INSTALL_REV:-}" != "1792618285" ]; then
+	export VALVEOFF_INSTALL_REV=1792618285
+	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1792618285/install?rev=1792618285&ts=$(date +%s)")
 fi
 
 # ── Config ──────────────────────────────────────────────────────────────────
 # ValveOFF 1.5 branch — separate from main (ValveOFF 1.4). Do not point 1.4
 # installs here; use `main` for 1.4.
 REPO="dvahana2424-web/hammerdeckydowngrade"
-BRANCH="steam-1791918634"
+BRANCH="steam-1792618285"
+TARGET_STEAM_BUILD=1792618285
+# SteamTracking commit where ClientManifest/steam_client_ubuntu12 == 1792618285
+STEAM_TRACKING_SHA="${STEAM_TRACKING_SHA:-5ac8059e326268232f8bf80ba49e75d9cea69ed5}"
+STEAM_DOWNGRADE_PARALLEL="${STEAM_DOWNGRADE_PARALLEL:-4}"
 # Bundle parts stay on valveoff-1.5. This branch only replaces the .so files
 # and config.yaml after that download.
 BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-valveoff-1.5}"
@@ -183,6 +191,161 @@ stop_steam() {
 		sleep 2
 		pkill -KILL steam steamwebhelper 2>/dev/null || true
 	fi
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  STEAM DOWNGRADE (Headcrab-compatible build) + steam.cfg lock
+# ═════════════════════════════════════════════════════════════════════════════
+resolve_steam_package_dir() {
+	local d
+	for d in \
+		"$HOME_DIR/.steam/steam/package" \
+		"$HOME_DIR/.local/share/Steam/package" \
+		"$HOME_DIR/.var/app/com.valvesoftware.Steam/.steam/steam/package"; do
+		if [ -d "$d" ]; then
+			echo "$d"
+			return 0
+		fi
+	done
+	return 1
+}
+
+read_installed_steam_build() {
+	local pkg name manifest ver
+	pkg="$(resolve_steam_package_dir)" || return 1
+	for name in \
+		steam_client_steamdeck_stable_ubuntu12 \
+		steam_client_steamdeck_publicbeta_ubuntu12 \
+		steam_client_ubuntu12 \
+		steam_client_publicbeta_ubuntu12; do
+		manifest="$pkg/${name}.manifest"
+		if [ -f "$manifest" ]; then
+			ver="$(grep -m1 '"version"' "$manifest" \
+				| sed -n 's/.*"version"[[:space:]]*"\([0-9][0-9]*\)".*/\1/p')"
+			if [ -n "$ver" ]; then
+				echo "$ver"
+				return 0
+			fi
+		fi
+	done
+	return 1
+}
+
+steam_client_running() {
+	local prog pid state
+	for prog in steam steamwebhelper reaper; do
+		while read -r pid; do
+			[ -n "$pid" ] || continue
+			state="$(awk '{print $3}' "/proc/$pid/stat" 2>/dev/null)" || continue
+			[ "$state" = "Z" ] && continue
+			return 0
+		done < <(pgrep -x "$prog" 2>/dev/null || true)
+	done
+	return 1
+}
+
+lock_steam_updates() {
+	local steam_dir cfg wrote=0
+	for steam_dir in \
+		"$HOME_DIR/.steam/steam" \
+		"$HOME_DIR/.var/app/com.valvesoftware.Steam/.steam/steam"; do
+		[ -d "$steam_dir" ] || continue
+		cfg="$steam_dir/steam.cfg"
+		printf '%s\n' \
+			"BootStrapperInhibitAll=enable" \
+			"BootStrapperForceSelfUpdate=disable" \
+			> "$cfg"
+		ok "Locked Steam updates → $cfg"
+		wrote=1
+	done
+	[ "$wrote" = 1 ] || warn "No Steam install dir found — could not write steam.cfg."
+}
+
+ensure_steam_target_build() {
+	title "Steam client → build $TARGET_STEAM_BUILD (Headcrab-compatible)"
+	local current="" cache_subdir cache_dir tmp
+	tmp=""
+	current="$(read_installed_steam_build 2>/dev/null || true)"
+	if [ -n "$current" ]; then
+		info "Detected Steam client build: $current"
+	else
+		warn "Could not read installed Steam build from package/*.manifest"
+	fi
+
+	if [ "$current" = "$TARGET_STEAM_BUILD" ]; then
+		ok "Steam is already build $TARGET_STEAM_BUILD."
+		lock_steam_updates
+		return 0
+	fi
+
+	if [ "${SKIP_STEAM_DOWNGRADE:-0}" = "1" ]; then
+		warn "SKIP_STEAM_DOWNGRADE=1 — skipping downgrade (target $TARGET_STEAM_BUILD)."
+		lock_steam_updates
+		return 0
+	fi
+
+	command -v python3 >/dev/null 2>&1 \
+		|| die "python3 is required to downgrade Steam to build $TARGET_STEAM_BUILD."
+
+	if steam_client_running; then
+		stop_steam
+		sleep 1
+	fi
+	if steam_client_running; then
+		die "Steam is still running — close it fully (steam -shutdown), then re-run."
+	fi
+
+	local stage_py ensure_py apply_py base_url
+	base_url="$BRANCH_RAW_BASE/steam-cache"
+	tmp="$(mktemp -d "${TMPDIR:-/tmp}/hammer-steam-downgrade.XXXXXX")"
+	stage_py="$tmp/stage-build.py"
+	ensure_py="$tmp/ensure-zipvz.py"
+	apply_py="$tmp/apply-downgrade.py"
+
+	info "Downloading downgrade helpers from $base_url …"
+	curl -fsSL --retry 3 --retry-delay 2 -o "$stage_py" "$base_url/stage-build.py" \
+		|| { rm -rf "$tmp"; die "Could not download stage-build.py"; }
+	curl -fsSL --retry 3 --retry-delay 2 -o "$ensure_py" "$base_url/ensure-zipvz.py" \
+		|| { rm -rf "$tmp"; die "Could not download ensure-zipvz.py"; }
+	curl -fsSL --retry 3 --retry-delay 2 -o "$apply_py" "$base_url/apply-downgrade.py" \
+		|| { rm -rf "$tmp"; die "Could not download apply-downgrade.py"; }
+	chmod +x "$stage_py" "$ensure_py" "$apply_py"
+
+	warn "Downgrading Steam ($current → $TARGET_STEAM_BUILD). Large CDN download — please wait."
+	info "Staging packages (parallel=$STEAM_DOWNGRADE_PARALLEL) …"
+	cache_subdir="$(
+		python3 "$stage_py" \
+			--version "$TARGET_STEAM_BUILD" \
+			--sha "$STEAM_TRACKING_SHA" \
+			--parallel "$STEAM_DOWNGRADE_PARALLEL"
+	)" || { rm -rf "$tmp"; die "Steam package staging failed." }
+	[ -n "$cache_subdir" ] || { rm -rf "$tmp"; die "Staging returned empty cache id."; }
+
+	cache_dir="${HOME_DIR}/.cache/hammer-downgrader/${cache_subdir}"
+	[ -f "$cache_dir/.hammer-stage.json" ] \
+		|| { rm -rf "$tmp"; die "Staged cache missing: $cache_dir"; }
+
+	info "Preparing zipvz payloads …"
+	python3 "$ensure_py" "$cache_dir" \
+		|| { rm -rf "$tmp"; die "ensure-zipvz failed." }
+
+	warn "Applying downgrade via local package server + steam.cfg lock …"
+	warn "Do not start Steam manually until this step finishes."
+	if ! python3 "$apply_py" "$cache_subdir"; then
+		rm -rf "$tmp"
+		die "Steam downgrade apply step failed."
+	fi
+	rm -rf "$tmp"
+
+	current="$(read_installed_steam_build 2>/dev/null || true)"
+	if [ "$current" = "$TARGET_STEAM_BUILD" ]; then
+		ok "Steam is now build $TARGET_STEAM_BUILD with steam.cfg blocking auto-update."
+	else
+		warn "Downgrade finished but package manifest shows: ${current:-unknown}"
+		warn "Open Steam once in Desktop Mode to verify, then re-run if needed."
+	fi
+	lock_steam_updates
+	return 0
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -403,7 +566,7 @@ install_core() {
 }
 
 # Always pull hammersteam.so + library-inject.so + config.yaml from
-# steam-1791918634 after the valveoff-1.5 bundle install. Paths mirror Hammer's
+# this branch after the valveoff-1.5 bundle install. Paths mirror Hammer's
 # C++ resolver (HAMMER_CONFIG_DIR → XDG_CONFIG_HOME/hammersteam → ~/.config/hammersteam).
 resolve_hammer_config_dir() {
 	if [ -n "${HAMMER_CONFIG_DIR:-}" ]; then
@@ -418,7 +581,7 @@ resolve_hammer_config_dir() {
 }
 
 refresh_hammer_from_github() {
-	title "Refresh Hammer for Steam 1791918634 (bin + config.yaml)"
+	title "Refresh Hammer for Steam $TARGET_STEAM_BUILD (bin + config.yaml)"
 	local hammer_dir="$HOME_DIR/.local/share/Hammer"
 	local config_dir config_file
 	config_dir="$(resolve_hammer_config_dir)"
@@ -608,6 +771,7 @@ main() {
 
 	smart_cleanup
 	stop_steam
+	ensure_steam_target_build || die "Steam downgrade step failed."
 	download_bundle
 	install_decky
 	install_core

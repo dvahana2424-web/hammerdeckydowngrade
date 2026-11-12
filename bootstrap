@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Steam client 1791918634 — one-paste bootstrap.
-# Does not replace valveoff-1.5. That command stays:
-#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
-#
-# This build:
+# Steam client 1792618285 — downgrade + lock + ValveOFF + Hammer (one paste).
+# Does not replace steam-1791918634. That command stays:
 #   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/bootstrap | bash
+#
+# This build (Headcrab-compatible client 1792618285):
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1792618285/bootstrap | bash
 #
 set -uo pipefail
 REPO="${VALVEOFF_REPO:-dvahana2424-web/hammerdeckydowngrade}"
-BRANCH="${VALVEOFF_BRANCH:-steam-1791918634}"
-export VALVEOFF_INSTALL_REV=1791918634
+BRANCH="${VALVEOFF_BRANCH:-steam-1792618285}"
+export VALVEOFF_INSTALL_REV=1792618285
 exec bash <(curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/install?ts=$(date +%s)")
