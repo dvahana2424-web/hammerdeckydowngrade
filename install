@@ -43,7 +43,7 @@ set -uo pipefail
 # Re-fetch this script when launched via a stale CDN copy (e.g. old checksum logic).
 # steam-1792618285-install-rev=1792618285-steamrt64-v5
 # Pin helpers + install to an immutable commit (branch CDN tips go stale).
-_INSTALL_PIN="${VALVEOFF_INSTALL_REF:-eafdedec58d35b04026bea9b206acd29eac1c393}"
+_INSTALL_PIN="${VALVEOFF_INSTALL_REF:-f670e928840c8315edcff7925b57a4653f3ebb05}"
 if [ "${VALVEOFF_INSTALL_REV:-}" != "1792618285-steamrt64-v5" ]; then
 	export VALVEOFF_INSTALL_REV=1792618285-steamrt64-v5
 	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/${_INSTALL_PIN}/install")
@@ -335,7 +335,7 @@ ensure_steam_target_build() {
 	fi
 
 	local stage_py ensure_py apply_py channel_py base_url pin
-	pin="${VALVEOFF_INSTALL_REF:-${_INSTALL_PIN:-eafdedec58d35b04026bea9b206acd29eac1c393}}"
+	pin="${VALVEOFF_INSTALL_REF:-${_INSTALL_PIN:-f670e928840c8315edcff7925b57a4653f3ebb05}}"
 	# Always fetch helpers from the pinned commit — never the stale branch tip.
 	base_url="https://raw.githubusercontent.com/$REPO/${pin}/steam-cache"
 	tmp="$(mktemp -d "${TMPDIR:-/tmp}/hammer-steam-downgrade.XXXXXX")"
