@@ -9,8 +9,10 @@
 #  Prefer `bootstrap` over `install` directly — GitHub raw CDN can serve a stale
 #  `install` copy for several minutes after an update (checksum / logic fixes).
 #
-#  Steam 1792618285 (this branch): checks your client, Headcrab-style downgrade if
-#  needed, locks updates via steam.cfg, then ValveOFF + Hammer. Older builds:
+#  Steam 1792618285 (this branch), fully automatic after one sudo prompt:
+#    strip Hammer LD_AUDIT from steam-jupiter/desktop → Headcrab downgrade +
+#    steam.cfg lock → ValveOFF + Hammer files → strip LD_AUDIT again (Steam
+#    must start; Hammer patterns still target 1791918634). Older builds:
 #    steam-1791918634/bootstrap | bash
 #  ValveOFF 1.5 only (no downgrade):
 #    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
@@ -44,8 +46,9 @@ set -uo pipefail
 # steam-1792618285-install-rev=1792618285-steamrt64-v5
 # Pin helpers + install to an immutable commit (branch CDN tips go stale).
 _INSTALL_PIN="${VALVEOFF_INSTALL_REF:-f670e928840c8315edcff7925b57a4653f3ebb05}"
-if [ "${VALVEOFF_INSTALL_REV:-}" != "1792618285-steamrt64-v5" ]; then
-	export VALVEOFF_INSTALL_REV=1792618285-steamrt64-v5
+# steam-1792618285-install-rev=1792618285-steamrt64-v6
+if [ "${VALVEOFF_INSTALL_REV:-}" != "1792618285-steamrt64-v6" ]; then
+	export VALVEOFF_INSTALL_REV=1792618285-steamrt64-v6
 	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/${_INSTALL_PIN}/install")
 fi
 
@@ -192,6 +195,56 @@ stop_steam() {
 		pkill -TERM steam steamwebhelper 2>/dev/null || true
 		sleep 2
 		pkill -KILL steam steamwebhelper 2>/dev/null || true
+	fi
+	# Also stop via steam -shutdown when available (cleaner tray exit).
+	command -v steam >/dev/null 2>&1 && steam -shutdown 2>/dev/null || true
+}
+
+# Remove Hammer LD_AUDIT from Deck launchers so textmode downgrade + Steam start
+# are not poisoned by steam-jupiter re-exporting 32-bit audit libs.
+strip_hammer_ld_audit() {
+	title "Strip Hammer LD_AUDIT (required for Steam downgrade)"
+	local changed=0 f tmp
+
+	# Desktop Mode launchers (user-writable).
+	for f in \
+		"$HOME_DIR/.local/share/applications/steam.desktop" \
+		"$HOME_DIR/.local/share/applications/steam-native.desktop"; do
+		[ -f "$f" ] || continue
+		if grep -q 'LD_AUDIT=.*Hammer\|hammersteam\.so\|library-inject\.so' "$f" 2>/dev/null; then
+			sed -i 's|env LD_AUDIT="[^"]*" ||g' "$f"
+			ok "Stripped LD_AUDIT from $f"
+			changed=1
+		fi
+	done
+
+	# Game Mode / Deck: /usr/bin/steam → steam-jupiter (needs writable /usr).
+	for f in /usr/bin/steam-jupiter /usr/local/bin/steam; do
+		[ -f "$f" ] || continue
+		if ! grep -qE 'Hammer|hammersteam\.so|library-inject\.so|hammer-ld-audit' "$f" 2>/dev/null; then
+			continue
+		fi
+		unlock_rootfs
+		tmp="$(mktemp)"
+		# Drop ValveOFF hammer-ld-audit block + any leftover Hammer LD_AUDIT lines.
+		awk '
+			/# >>> hammer-ld-audit >>>/ { skip=1; next }
+			/# <<< hammer-ld-audit <<</ { skip=0; next }
+			skip { next }
+			/LD_AUDIT=.*Hammer|LD_AUDIT=.*hammersteam|LD_AUDIT=.*library-inject|export LD_AUDIT=.*Hammer/ { next }
+			{ print }
+		' "$f" > "$tmp"
+		if sudo install -m 0755 "$tmp" "$f" 2>/dev/null; then
+			ok "Stripped Hammer LD_AUDIT from $f"
+			changed=1
+		else
+			warn "Could not edit $f (sudo/permission) — downgrade may hit ELFCLASS32 / online-update errors."
+		fi
+		rm -f "$tmp"
+	done
+
+	if [ "$changed" = 0 ]; then
+		ok "No Hammer LD_AUDIT left in Steam launchers."
 	fi
 }
 
@@ -825,7 +878,7 @@ apply_gamemode_unlock() {
 #  MAIN
 # ═════════════════════════════════════════════════════════════════════════════
 main() {
-	title "ValveOFF 1.5 one-paste installer"
+	title "ValveOFF 1.5 one-paste installer (Steam $TARGET_STEAM_BUILD)"
 	info "User: $USER_NAME    Home: $HOME_DIR"
 	info "Downloads: $DL_DIR"
 	detect_distro
@@ -833,6 +886,9 @@ main() {
 
 	smart_cleanup
 	stop_steam
+	# Must run before downgrade: steam-jupiter re-exports Hammer LD_AUDIT and
+	# breaks textmode local package apply ("needs to be online" / ELFCLASS32).
+	strip_hammer_ld_audit
 	ensure_steam_target_build || die "Steam downgrade step failed."
 	download_bundle
 	install_decky
@@ -841,27 +897,29 @@ main() {
 	overlay_hammer_decky_in_bundle
 	install_hammer_decky_from_bundle
 	apply_gamemode_unlock
+	# ValveOFF gamemode-install re-wires LD_AUDIT — strip again so Steam can
+	# actually start on 1792618285 (current Hammer patterns are for 1791918634).
+	strip_hammer_ld_audit
 	relock_rootfs
 
 	title "${C_B}DONE${C_RST}"
 	cat <<EOF
 
-  ValveOFF is installed. Final manual step (one time):
+  Steam should be build ${TARGET_STEAM_BUILD} (locked via steam.cfg).
 
-  ${C_B}1.${C_RST} Launch Steam in Desktop Mode (let it update if it wants — that's fine).
+  ${C_B}1.${C_RST} Launch Steam in Desktop Mode and confirm Settings → Version.
   ${C_B}2.${C_RST} Run ValveOFF once to activate your license:
          "$DEST/ValveOFF"
-       (or from the KDE menu) — this writes the device-bound activation
-       that hammer-decky needs for Game Mode.
-  ${C_B}3.${C_RST} Switch to Game Mode → quick-access menu (•••) → Hammer Library.
+  ${C_B}3.${C_RST} Hammer .so/config are installed, but LD_AUDIT was left OFF on
+       this branch so Steam does not SEGV (Hammer still tuned for 1791918634).
+       hammer-decky is installed for when Hammer hooks are retargeted.
 
   Bundle / re-run / uninstall:
        cd "$DEST"
-       ./install.sh status       # what's installed
-       ./install.sh verify       # did Hammer load in Desktop Mode?
-       ./install.sh uninstall    # remove everything (keeps config)
+       ./install.sh status
+       ./install.sh uninstall
 
-  Salamat! Enjoy ValveOFF.
+  Salamat!
 EOF
 }
 
