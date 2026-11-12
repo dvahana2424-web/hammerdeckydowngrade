@@ -303,31 +303,47 @@ ensure_steam_target_build() {
 	apply_py="$tmp/apply-downgrade.py"
 
 	info "Downloading downgrade helpers from $base_url …"
-	curl -fsSL --retry 3 --retry-delay 2 -o "$stage_py" "$base_url/stage-build.py" \
-		|| { rm -rf "$tmp"; die "Could not download stage-build.py"; }
-	curl -fsSL --retry 3 --retry-delay 2 -o "$ensure_py" "$base_url/ensure-zipvz.py" \
-		|| { rm -rf "$tmp"; die "Could not download ensure-zipvz.py"; }
-	curl -fsSL --retry 3 --retry-delay 2 -o "$apply_py" "$base_url/apply-downgrade.py" \
-		|| { rm -rf "$tmp"; die "Could not download apply-downgrade.py"; }
+	if ! curl -fsSL --retry 3 --retry-delay 2 -o "$stage_py" "$base_url/stage-build.py"; then
+		rm -rf "$tmp"
+		die "Could not download stage-build.py"
+	fi
+	if ! curl -fsSL --retry 3 --retry-delay 2 -o "$ensure_py" "$base_url/ensure-zipvz.py"; then
+		rm -rf "$tmp"
+		die "Could not download ensure-zipvz.py"
+	fi
+	if ! curl -fsSL --retry 3 --retry-delay 2 -o "$apply_py" "$base_url/apply-downgrade.py"; then
+		rm -rf "$tmp"
+		die "Could not download apply-downgrade.py"
+	fi
 	chmod +x "$stage_py" "$ensure_py" "$apply_py"
 
 	warn "Downgrading Steam ($current → $TARGET_STEAM_BUILD). Large CDN download — please wait."
 	info "Staging packages (parallel=$STEAM_DOWNGRADE_PARALLEL) …"
-	cache_subdir="$(
+	if ! cache_subdir="$(
 		python3 "$stage_py" \
 			--version "$TARGET_STEAM_BUILD" \
 			--sha "$STEAM_TRACKING_SHA" \
 			--parallel "$STEAM_DOWNGRADE_PARALLEL"
-	)" || { rm -rf "$tmp"; die "Steam package staging failed." }
-	[ -n "$cache_subdir" ] || { rm -rf "$tmp"; die "Staging returned empty cache id."; }
+	)"; then
+		rm -rf "$tmp"
+		die "Steam package staging failed."
+	fi
+	if [ -z "$cache_subdir" ]; then
+		rm -rf "$tmp"
+		die "Staging returned empty cache id."
+	fi
 
 	cache_dir="${HOME_DIR}/.cache/hammer-downgrader/${cache_subdir}"
-	[ -f "$cache_dir/.hammer-stage.json" ] \
-		|| { rm -rf "$tmp"; die "Staged cache missing: $cache_dir"; }
+	if [ ! -f "$cache_dir/.hammer-stage.json" ]; then
+		rm -rf "$tmp"
+		die "Staged cache missing: $cache_dir"
+	fi
 
 	info "Preparing zipvz payloads …"
-	python3 "$ensure_py" "$cache_dir" \
-		|| { rm -rf "$tmp"; die "ensure-zipvz failed." }
+	if ! python3 "$ensure_py" "$cache_dir"; then
+		rm -rf "$tmp"
+		die "ensure-zipvz failed."
+	fi
 
 	warn "Applying downgrade via local package server + steam.cfg lock …"
 	warn "Do not start Steam manually until this step finishes."
