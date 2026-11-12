@@ -41,10 +41,12 @@
 set -uo pipefail
 
 # Re-fetch this script when launched via a stale CDN copy (e.g. old checksum logic).
-# steam-1792618285-install-rev=1792618285
-if [ "${VALVEOFF_INSTALL_REV:-}" != "1792618285" ]; then
-	export VALVEOFF_INSTALL_REV=1792618285
-	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1792618285/install?rev=1792618285&ts=$(date +%s)")
+# steam-1792618285-install-rev=1792618285-steamrt64
+# Pin to the steamrt64 detection fix; branch CDN tips go stale for minutes/hours.
+_INSTALL_PIN="${VALVEOFF_INSTALL_REF:-85ba68eea3df32dde9bab674fea73bead2804070}"
+if [ "${VALVEOFF_INSTALL_REV:-}" != "1792618285-steamrt64" ]; then
+	export VALVEOFF_INSTALL_REV=1792618285-steamrt64
+	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/${_INSTALL_PIN}/install")
 fi
 
 # ── Config ──────────────────────────────────────────────────────────────────

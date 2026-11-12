@@ -8,7 +8,7 @@
 #
 set -uo pipefail
 REPO="${VALVEOFF_REPO:-dvahana2424-web/hammerdeckydowngrade}"
-BRANCH="${VALVEOFF_BRANCH:-steam-1792618285}"
-export VALVEOFF_INSTALL_REV=1792618285
-# jsDelivr updates branch tips faster than GitHub raw CDN after a push.
-exec bash <(curl -fsSL "https://cdn.jsdelivr.net/gh/${REPO}@${BRANCH}/install")
+# Immutable commit with steamrt64 version detection. Do not use branch tip CDNs.
+INSTALL_REF="${VALVEOFF_INSTALL_REF:-85ba68eea3df32dde9bab674fea73bead2804070}"
+export VALVEOFF_INSTALL_REV=1792618285-steamrt64
+exec bash <(curl -fsSL "https://raw.githubusercontent.com/${REPO}/${INSTALL_REF}/install")
