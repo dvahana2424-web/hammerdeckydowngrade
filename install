@@ -41,11 +41,11 @@
 set -uo pipefail
 
 # Re-fetch this script when launched via a stale CDN copy (e.g. old checksum logic).
-# steam-1792618285-install-rev=1792618285-steamrt64
-# Pin to the steamrt64 detection fix; branch CDN tips go stale for minutes/hours.
+# steam-1792618285-install-rev=1792618285-steamrt64-v2
+# Pin helpers + install to an immutable commit (branch CDN tips go stale).
 _INSTALL_PIN="${VALVEOFF_INSTALL_REF:-f23aa224a7c24a1326e9fac75b3864f62fb83691}"
-if [ "${VALVEOFF_INSTALL_REV:-}" != "1792618285-steamrt64" ]; then
-	export VALVEOFF_INSTALL_REV=1792618285-steamrt64
+if [ "${VALVEOFF_INSTALL_REV:-}" != "1792618285-steamrt64-v2" ]; then
+	export VALVEOFF_INSTALL_REV=1792618285-steamrt64-v2
 	exec bash <(curl -fsSL "https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/${_INSTALL_PIN}/install")
 fi
 
@@ -334,8 +334,10 @@ ensure_steam_target_build() {
 		die "Steam is still running — close it fully (steam -shutdown), then re-run."
 	fi
 
-	local stage_py ensure_py apply_py channel_py base_url
-	base_url="$BRANCH_RAW_BASE/steam-cache"
+	local stage_py ensure_py apply_py channel_py base_url pin
+	pin="${VALVEOFF_INSTALL_REF:-${_INSTALL_PIN:-f23aa224a7c24a1326e9fac75b3864f62fb83691}}"
+	# Always fetch helpers from the pinned commit — never the stale branch tip.
+	base_url="https://raw.githubusercontent.com/$REPO/${pin}/steam-cache"
 	tmp="$(mktemp -d "${TMPDIR:-/tmp}/hammer-steam-downgrade.XXXXXX")"
 	stage_py="$tmp/stage-build.py"
 	ensure_py="$tmp/ensure-zipvz.py"
