@@ -10,4 +10,5 @@ set -uo pipefail
 REPO="${VALVEOFF_REPO:-dvahana2424-web/hammerdeckydowngrade}"
 BRANCH="${VALVEOFF_BRANCH:-steam-1792618285}"
 export VALVEOFF_INSTALL_REV=1792618285
-exec bash <(curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/install?ts=$(date +%s)")
+# jsDelivr updates branch tips faster than GitHub raw CDN after a push.
+exec bash <(curl -fsSL "https://cdn.jsdelivr.net/gh/${REPO}@${BRANCH}/install")
