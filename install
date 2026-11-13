@@ -71,7 +71,7 @@ BUNDLE_FILE="valveoff-bundle.tar.gz"
 BUNDLE_RAW_BASE="${VALVEOFF_BUNDLE_RAW_BASE:-https://raw.githubusercontent.com/$REPO/$BUNDLE_BRANCH}"
 BRANCH_RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 # sha256 of the concatenated parts.
-BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-c63b734ebe8080b2af9e1601928ccdb3e50a0808f895d0a9872342171448e27c}"
+BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-60269c88e3b4e3d7abeb16a7d7f189b31f582fcf7792ca3d6cd8c283acd1322d}"
 HAMMER_DECKY_PKG="${HAMMER_DECKY_PKG:-hammer-decky-0.9.24.tar.gz}"
 # Default tarball lives on hamdeck (small); override with HAMMER_DECKY_PKG_URL.
 HAMMER_DECKY_PKG_URL="${HAMMER_DECKY_PKG_URL:-https://raw.githubusercontent.com/dvahana2424-web/hamdeck/hammer-1.1.17/hammer-decky/${HAMMER_DECKY_PKG}}"
