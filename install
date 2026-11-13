@@ -844,11 +844,17 @@ install_hammer_decky_runtime_only() {
 	rm -f "$dst/dist/index.js.map" 2>/dev/null || true
 }
 
-# Install hammer-decky from $DEST/hammer-decky (bundle + optional overlay tarball).
+# Install hammer-decky from the extracted ValveOFF 1.5 folder.
+# ~/homebrew/plugins is root-owned on SteamOS, so a plain cp cannot create
+# the plugin directory. Always use sudo in that case, then require
+# package.json "type": "module" or Decky evals dist/index.js and throws
+# Unexpected token 'export'.
 install_hammer_decky_from_bundle() {
-	title "hammer-decky (ValveOFF bundle + GitHub overlay)"
+	title "hammer-decky (decky-install)"
 	local dst="$HOME_DIR/homebrew/plugins/hammer-decky"
 	local src="$DEST/hammer-decky"
+	local plugins="$HOME_DIR/homebrew/plugins"
+	local stage
 
 	if ! decky_installed; then
 		warn "Decky Loader not installed — skipping hammer-decky."
@@ -856,8 +862,8 @@ install_hammer_decky_from_bundle() {
 	fi
 
 	if [ ! -d "$src" ] || [ ! -f "$src/dist/index.js" ]; then
-		warn "hammer-decky not found in bundle ($src) — skipping."
-		return 0
+		err "hammer-decky not found in bundle ($src)."
+		return 1
 	fi
 
 	if ! hammer_decky_dist_ok "$src/dist/index.js"; then
@@ -866,18 +872,46 @@ install_hammer_decky_from_bundle() {
 		return 1
 	fi
 
-	info "Installing hammer-decky (runtime only) to $dst …"
-	if [ -d "$dst" ] && [ ! -w "$dst" ]; then
-		sudo rm -rf "$dst"
-	fi
-	mkdir -p "$dst"
-	rm -rf "${dst:?}/"*
-	install_hammer_decky_runtime_only "$src" "$dst" || return 1
-	if [ ! -w "$dst" ]; then
-		sudo chown -R "$USER_NAME:$(id -gn)" "$dst" 2>/dev/null || true
+	if [ -x "$DEST/install.sh" ]; then
+		info "Running $DEST/install.sh decky-install …"
+		( cd "$DEST" && bash ./install.sh decky-install ) \
+			|| warn "bundle decky-install reported an error — copying the plugin files directly."
 	fi
 
-	ok "hammer-decky installed from bundle."
+	stage="$(mktemp -d "${TMPDIR:-/tmp}/hammer-decky-stage.XXXXXX")"
+	mkdir -p "$stage/dist"
+	cp -f "$src/main.py" "$src/plugin.json" "$stage/"
+	cp -f "$src/dist/index.js" "$stage/dist/"
+	if [ -f "$src/package.json" ] && grep -q '"type"[[:space:]]*:[[:space:]]*"module"' "$src/package.json"; then
+		cp -f "$src/package.json" "$stage/"
+	else
+		write_hammer_decky_package_json "$stage"
+	fi
+	chmod 0755 "$stage/main.py"
+
+	if [ ! -w "$plugins" ] || { [ -e "$dst" ] && [ ! -w "$dst" ]; }; then
+		info "plugins dir is not writable by $USER_NAME — using sudo."
+		sudo mkdir -p "$dst" || { rm -rf "$stage"; return 1; }
+		sudo rm -rf "${dst:?}/"*
+		sudo cp -a "$stage/." "$dst/" || { rm -rf "$stage"; return 1; }
+		sudo chown -R "$USER_NAME:$(id -gn)" "$dst" || { rm -rf "$stage"; return 1; }
+	else
+		mkdir -p "$dst"
+		rm -rf "${dst:?}/"*
+		cp -a "$stage/." "$dst/" || { rm -rf "$stage"; return 1; }
+	fi
+	rm -rf "$stage"
+
+	if [ ! -f "$dst/package.json" ] || ! grep -q '"type"[[:space:]]*:[[:space:]]*"module"' "$dst/package.json"; then
+		err "hammer-decky is missing package.json type=module at $dst"
+		return 1
+	fi
+	if [ ! -f "$dst/dist/index.js" ] || ! head -1 "$dst/dist/index.js" | grep -q '^const manifest ='; then
+		err "hammer-decky dist/index.js missing at $dst"
+		return 1
+	fi
+
+	ok "hammer-decky installed at $dst (package.json type=module)."
 	if systemctl is-active plugin_loader >/dev/null 2>&1; then
 		sudo systemctl restart plugin_loader 2>/dev/null \
 			&& ok "Restarted plugin_loader." \
@@ -920,7 +954,7 @@ main() {
 	# Run again after the bundle install, in case an older install.sh recreated it.
 	clear_steamrt64_sentinel
 	overlay_hammer_decky_in_bundle
-	install_hammer_decky_from_bundle
+	install_hammer_decky_from_bundle || die "hammer-decky (decky-install) failed."
 	apply_gamemode_unlock
 	relock_rootfs
 	clear_steamrt64_sentinel
@@ -938,6 +972,8 @@ main() {
          "$DEST/ValveOFF"
   ${C_B}4.${C_RST} Ownership + GetManifest + manifest pin are ON in config.yaml.
        Do not enable AutoRediscoverPatterns on this client.
+  ${C_B}5.${C_RST} hammer-decky is installed at ~/homebrew/plugins/hammer-decky
+       (package.json type=module). Quit Steam fully, then open it again.
 
   Bundle / re-run / uninstall:
        cd "$DEST"
