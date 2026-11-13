@@ -797,6 +797,37 @@ overlay_hammer_decky_in_bundle() {
 	fi
 }
 
+# Decky must get compiled dist/index.js only — never src/, package.json, or rollup.config.js
+# (those make importReactPlugin throw "Unexpected token 'export'").
+hammer_decky_dist_ok() {
+	local f="$1"
+	[ -f "$f" ] || return 1
+	if ! head -1 "$f" | grep -q '^const manifest ='; then
+		return 1
+	fi
+	if head -20 "$f" | grep -qE '^(import |export default )'; then
+		return 1
+	fi
+	if grep -q 'React\.createElement' "$f" 2>/dev/null; then
+		return 1
+	fi
+	return 0
+}
+
+install_hammer_decky_runtime_only() {
+	local src="$1" dst="$2"
+	mkdir -p "$dst/dist"
+	cp -f "$src/main.py" "$src/plugin.json" "$dst/"
+	cp -f "$src/dist/index.js" "$dst/dist/"
+	chmod 0755 "$dst/main.py" 2>/dev/null || true
+	chmod -R a+rX "$dst/dist" 2>/dev/null || true
+	# Drop dev tree from older bundles / manual copies.
+	rm -rf "$dst/src" "$dst/node_modules" 2>/dev/null || true
+	rm -f "$dst/package.json" "$dst/rollup.config.js" "$dst/tsconfig.json" \
+		"$dst/pnpm-lock.yaml" 2>/dev/null || true
+	rm -f "$dst/dist/index.js.map" 2>/dev/null || true
+}
+
 # Install hammer-decky from $DEST/hammer-decky (bundle + optional overlay tarball).
 install_hammer_decky_from_bundle() {
 	title "hammer-decky (ValveOFF bundle + GitHub overlay)"
@@ -813,23 +844,22 @@ install_hammer_decky_from_bundle() {
 		return 0
 	fi
 
-	if grep -q 'React\.createElement' "$src/dist/index.js" 2>/dev/null; then
-		warn "Bundle hammer-decky dist uses React.createElement — refusing broken build."
+	if ! hammer_decky_dist_ok "$src/dist/index.js"; then
+		err "hammer-decky dist/index.js is not a compiled Decky bundle (needs const manifest=…, no top-level import/export)."
+		err "  Source: $src/dist/index.js"
 		return 1
 	fi
 
-	info "Installing hammer-decky from bundle to $dst …"
+	info "Installing hammer-decky (runtime only) to $dst …"
 	if [ -d "$dst" ] && [ ! -w "$dst" ]; then
 		sudo rm -rf "$dst"
-		sudo mkdir -p "$dst"
-		sudo cp -a "$src/." "$dst/"
-		sudo chown -R "$USER_NAME:$(id -gn)" "$dst"
-	else
-		mkdir -p "$dst"
-		rm -rf "${dst:?}/"*
-		cp -a "$src/." "$dst/"
 	fi
-	chmod 0755 "$dst/main.py" 2>/dev/null || true
+	mkdir -p "$dst"
+	rm -rf "${dst:?}/"*
+	install_hammer_decky_runtime_only "$src" "$dst" || return 1
+	if [ ! -w "$dst" ]; then
+		sudo chown -R "$USER_NAME:$(id -gn)" "$dst" 2>/dev/null || true
+	fi
 
 	ok "hammer-decky installed from bundle."
 	if systemctl is-active plugin_loader >/dev/null 2>&1; then
