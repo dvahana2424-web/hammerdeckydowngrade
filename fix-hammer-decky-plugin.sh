@@ -37,6 +37,7 @@ rm -f "${PLUGIN_DST}/package.json" "${PLUGIN_DST}/rollup.config.js" \
 
 echo "[OK] hammer-decky runtime installed to ${PLUGIN_DST}"
 if systemctl is-active plugin_loader >/dev/null 2>&1; then
-	sudo systemctl restart plugin_loader && echo "[OK] plugin_loader restarted"
+	sudo systemctl restart plugin_loader 2>/dev/null && echo "[OK] plugin_loader restarted" \
+		|| echo "[WARN] Restart manually: sudo systemctl restart plugin_loader"
 fi
 echo "[..] Restart Steam (Desktop + Game Mode) so the QAM UI reloads."
