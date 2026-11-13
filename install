@@ -30,13 +30,15 @@
 #    3. Deletes ~/.local/share/Steam/.steam-disable-steamrt64-client
 #       (and the same file under ~/.steam/root and ~/.steam/steam)
 #       so the 64-bit client is allowed to start.
-#    4. Downloads the ValveOFF bundle into your Downloads folder.
+#    4. Downloads the stripped ValveOFF 1.5 folder hosted on THIS branch
+#       into ~/Downloads/ValveOFF 1.5/ (ELF64 libs, config, hammer-decky).
 #    5. Installs Decky Loader (latest) if it isn't already present.
 #    6. Installs Hammer + ValveOFF + hammer-decky and wires Desktop-Mode unlock.
 #    7. Applies Game-Mode unlock (steam-jupiter on SteamOS, /usr/local/bin/steam
 #       wrapper on Bazzite/atomic). LD_AUDIT stays ON.
-#    8. Overlays hammersteam.so, library-inject.so, and config.yaml from this
-#       branch. The rest of the bundle still comes from valveoff-1.5.
+#    8. Refreshes hammersteam.so, library-inject.so, and config.yaml from
+#       this branch after extract. hammer-decky stays the copy inside the
+#       bundle (keyboard fix). The old valveoff-1.5 bundle is not used.
 #
 #  Override the bundle source if you self-host:
 #    VALVEOFF_BUNDLE_URL=https://example/valveoff-bundle.tar.gz curl ... | bash
@@ -62,14 +64,14 @@ EXPECTED_INJECT_MD5="${EXPECTED_INJECT_MD5:-cae5920ce4b55a334646da078baa6fa4}"
 # Unused on this branch (no Steam downgrade). Kept so SKIP helpers still parse.
 STEAM_TRACKING_SHA="${STEAM_TRACKING_SHA:-}"
 STEAM_DOWNGRADE_PARALLEL="${STEAM_DOWNGRADE_PARALLEL:-4}"
-# Bundle parts stay on valveoff-1.5. This branch only replaces the .so files
-# and config.yaml after that download.
-BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-valveoff-1.5}"
+# Packed from the stripped workspace folder ValveOFF 1.5.
+# valveoff-1.5 remains the older bundle. This installer does not use it.
+BUNDLE_BRANCH="${VALVEOFF_BUNDLE_BRANCH:-steamrt64-1794424036}"
 BUNDLE_FILE="valveoff-bundle.tar.gz"
 BUNDLE_RAW_BASE="${VALVEOFF_BUNDLE_RAW_BASE:-https://raw.githubusercontent.com/$REPO/$BUNDLE_BRANCH}"
 BRANCH_RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
-# Authoritative checksum for the concatenated bundle parts on `valveoff-1.5`.
-BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-ee3f3279188e6ad56f2321b5da15d45df2bde5f0898c25011820f933ef0d1bc2}"
+# sha256 of the concatenated parts.
+BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-c63b734ebe8080b2af9e1601928ccdb3e50a0808f895d0a9872342171448e27c}"
 HAMMER_DECKY_PKG="${HAMMER_DECKY_PKG:-hammer-decky-0.9.24.tar.gz}"
 # Default tarball lives on hamdeck (small); override with HAMMER_DECKY_PKG_URL.
 HAMMER_DECKY_PKG_URL="${HAMMER_DECKY_PKG_URL:-https://raw.githubusercontent.com/dvahana2424-web/hamdeck/hammer-1.1.17/hammer-decky/${HAMMER_DECKY_PKG}}"
@@ -529,7 +531,7 @@ download_bundle() {
 	title "Download ValveOFF bundle → $DEST"
 	local tmp="$DL_DIR/.$BUNDLE_FILE.part"
 	rm -f "$tmp" 2>/dev/null || true
-	info "This is a large download (~140 MB) — please wait."
+	info "This is a large download (~135 MB) — please wait."
 
 	if [ -n "$BUNDLE_URL" ]; then
 		# Self-hosted single-file override.
@@ -767,9 +769,11 @@ refresh_hammer_from_github() {
 	fi
 }
 
-# Overlay the latest hammer-decky from a small tarball on the branch (avoids
-# re-downloading the full ~140MB valveoff bundle when only the plugin changed).
+# hammer-decky in the downloaded ValveOFF 1.5 folder is the release build
+# (dist/index.js + main.py). Do not replace it with the older hamdeck tarball.
 overlay_hammer_decky_in_bundle() {
+	ok "hammer-decky stays the copy inside the ValveOFF 1.5 download."
+	return 0
 	local url="${HAMMER_DECKY_PKG_URL:-$BRANCH_RAW_BASE/$HAMMER_DECKY_PKG}"
 	local tmp
 	tmp="$(mktemp -d "${TMPDIR:-/tmp}/hammer-decky-overlay.XXXXXX")"

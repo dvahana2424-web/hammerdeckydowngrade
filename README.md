@@ -3,9 +3,9 @@
 Works on **SteamOS (Steam Deck)**, **Bazzite**, and most other Linux distros.
 
 This branch installs the **ELF64** Hammer libraries for the **steamrt64** client
-on Steam build **1794424036**. It still downloads the ValveOFF 1.5 bundle
-(Decky, hammer-decky, unlock scripts), then replaces `hammersteam.so`,
-`library-inject.so`, and `config.yaml` with the copies on this branch.
+on Steam build **1794424036**. The one-paste command downloads the stripped
+ValveOFF 1.5 folder hosted on this same branch (ELF64 libraries, config, and
+the current hammer-decky, with no plugin source).
 
 1794424036 defaults to steamrt64. An empty file named
 `.steam-disable-steamrt64-client` forces the 32-bit client, and ELF64 Hammer
