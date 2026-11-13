@@ -59,7 +59,7 @@ fi
 REPO="dvahana2424-web/hammerdeckydowngrade"
 BRANCH="steamrt64-1794424036"
 TARGET_STEAM_BUILD=1794424036
-EXPECTED_HAMMER_MD5="${EXPECTED_HAMMER_MD5:-3677322f2ef2597ef16673f3b1614c98}"
+EXPECTED_HAMMER_MD5="${EXPECTED_HAMMER_MD5:-5de5a51d3fef752bf00d751c08a77007}"
 EXPECTED_INJECT_MD5="${EXPECTED_INJECT_MD5:-cae5920ce4b55a334646da078baa6fa4}"
 # Unused on this branch (no Steam downgrade). Kept so SKIP helpers still parse.
 STEAM_TRACKING_SHA="${STEAM_TRACKING_SHA:-}"
@@ -71,7 +71,7 @@ BUNDLE_FILE="valveoff-bundle.tar.gz"
 BUNDLE_RAW_BASE="${VALVEOFF_BUNDLE_RAW_BASE:-https://raw.githubusercontent.com/$REPO/$BUNDLE_BRANCH}"
 BRANCH_RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 # sha256 of the concatenated parts.
-BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-60269c88e3b4e3d7abeb16a7d7f189b31f582fcf7792ca3d6cd8c283acd1322d}"
+BUNDLE_SHA256="${VALVEOFF_BUNDLE_SHA256:-76184438a495bdb9c232cb5c4180d1e353083163137e04d61368e7b603aec144}"
 HAMMER_DECKY_PKG="${HAMMER_DECKY_PKG:-hammer-decky-0.9.24.tar.gz}"
 # Default tarball lives on hamdeck (small); override with HAMMER_DECKY_PKG_URL.
 HAMMER_DECKY_PKG_URL="${HAMMER_DECKY_PKG_URL:-https://raw.githubusercontent.com/dvahana2424-web/hamdeck/hammer-1.1.17/hammer-decky/${HAMMER_DECKY_PKG}}"

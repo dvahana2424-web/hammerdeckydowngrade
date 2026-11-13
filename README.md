@@ -41,10 +41,10 @@ You will be asked for your **sudo password once**. Everything else is automatic.
 4. Downloads the ValveOFF 1.5 bundle into `~/Downloads/ValveOFF 1.5/`.
 5. Installs Decky Loader if missing, then Hammer + ValveOFF + hammer-decky.
 6. Wires Desktop-Mode and Game-Mode `LD_AUDIT`.
-7. Overlays ELF64 `hammersteam.so` (MD5 `3677322f2ef2597ef16673f3b1614c98`),
+7. Overlays ELF64 `hammersteam.so` (MD5 `5de5a51d3fef752bf00d751c08a77007`),
    ELF64 `library-inject.so` (MD5 `cae5920ce4b55a334646da078baa6fa4`), and the
    working 1794424036 `config.yaml`
-   (`GetManifestRequestCodeOffset` `0x13a5840`,
+   (`GetManifestRequestCodeOffset` `0x13aed60`,
    `UserOwnsDepotOffset` `0x18eb1a0`,
    `BuildDepotDependencyOffset` `0x1079640`).
 

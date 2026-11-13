@@ -10,10 +10,10 @@
 #   KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steamrt64-1794424036/update-hammer.sh | bash
 #
 # What this build ships:
-#   - ELF64 hammersteam.so MD5 3677322f2ef2597ef16673f3b1614c98
+#   - ELF64 hammersteam.so MD5 5de5a51d3fef752bf00d751c08a77007
 #   - ELF64 library-inject.so MD5 cae5920ce4b55a334646da078baa6fa4
 #   - config.yaml for steamclient build 1794424036
-#       GetManifestRequestCodeOffset 0x13a5840
+#       GetManifestRequestCodeOffset 0x13aed60
 #       UserOwnsDepotOffset 0x18eb1a0
 #       BuildDepotDependencyOffset 0x1079640
 #
@@ -26,7 +26,7 @@ REPO_OWNER="dvahana2424-web"
 REPO_NAME="hammerdeckydowngrade"
 BRANCH="steamrt64-1794424036"
 BASE_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}"
-EXPECTED_HAMMER_MD5="3677322f2ef2597ef16673f3b1614c98"
+EXPECTED_HAMMER_MD5="5de5a51d3fef752bf00d751c08a77007"
 EXPECTED_INJECT_MD5="cae5920ce4b55a334646da078baa6fa4"
 
 HAMMER_DIR="${HAMMER_DIR:-$HOME/.local/share/Hammer}"
@@ -122,7 +122,7 @@ verify_config_offsets() {
 	local cfg="$1"
 	local key
 	for key in \
-		'GetManifestRequestCodeOffset: 0x13a5840' \
+		'GetManifestRequestCodeOffset: 0x13aed60' \
 		'UserOwnsDepotOffset: 0x18eb1a0' \
 		'BuildDepotDependencyOffset: 0x1079640'
 	do
