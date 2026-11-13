@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Steam Deck Stable 1794424036 — Hammer 1.1.21 one-paste.
+# Steam Deck Stable 1794424036 — steamrt64 ELF64 Hammer one-paste.
 # Does NOT replace older commands. Those stay:
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/bootstrap | bash
 #   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
 #   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/bootstrap | bash
 #   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1792618285/bootstrap | bash
 #
-# This build (stay on 1794424036, force ubuntu12_32, install working Hammer):
-#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/bootstrap | bash
+# This build (stay on 1794424036, use steamrt64, install ELF64 Hammer):
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steamrt64-1794424036/bootstrap | bash
 #
 set -uo pipefail
 REPO="${VALVEOFF_REPO:-dvahana2424-web/hammerdeckydowngrade}"
-BRANCH="${VALVEOFF_BRANCH:-steam-1794424036}"
-export VALVEOFF_INSTALL_REV=1794424036-ubuntu12-v1
+BRANCH="${VALVEOFF_BRANCH:-steamrt64-1794424036}"
+export VALVEOFF_INSTALL_REV=1794424036-steamrt64-v1
 exec bash <(curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/install?ts=$(date +%s)")

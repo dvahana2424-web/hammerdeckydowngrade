@@ -1,14 +1,22 @@
-# Hammer config overlay for Steam Deck Stable 1794424036 working
-# Verified 2026-11-12: fake ownership (Tunic 553420 Play), GetManifest
-# (Strikers 1279380 via Wudrm), manifest pin (BuildDepotDependency @ 0x11843c0).
+# Hammer — Steam Deck Stable 1794424036, steamrt64/steamclient.so (ELF64)
+# Scanned 2026-11-13 via tools/scan-steamrt64.py
+# Wrap model: AceSLS SLSsteam-20261112130346 (pure LD_AUDIT → inner steam after pv-adverb)
 #
-# Requires ELF32 hammersteam.so AND the 32-bit client:
-#   touch ~/.local/share/Steam/.steam-disable-steamrt64-client
-#   # or: STEAM_FORCE_CLIENT=ubuntu12_32
-# Copy over ~/.config/hammersteam/config.yaml and restart Steam.
-# See progressreport.txt (top) for the full flag table.
+# Deploy:
+#   cp res/config.steamrt64.1794424036.yaml ~/.config/hammersteam/config.yaml
+#   ./scripts/deploy-x64-side.sh
+#   # NO ~/.steam-disable-steamrt64-client  (stay on steamrt64)
+#   LD_AUDIT=~/.local/share/Hammer-x64/hammersteam.so steam
 #
-# 1794424036: FamilyGroup retn patches can land on the wrong fn after the client shift.
+# SLSsteam wrap notes (copy this approach):
+#   - setup.sh / desktop: env LD_AUDIT=…/SLSsteam.so steam
+#   - la_objopen waits for steamclient.so (+ steamui / tier0)
+#   - steamwebhelper: strip LD_AUDIT (Hammer now mirrors this)
+#   - game spawn: env -u LD_AUDIT (SLSsteam via SpawnGameId; Hammer strips after load())
+#   - VFT hooks via CSteamEngine::ProcessIPCFrame → getUser→getAppManager (Decompiler)
+#     Hammer still uses RunIPCFrame for LaunchApp/Steamless on 32-bit; x64 Steamless
+#     needs that VFT path next (no unique RunIPCFrame yet).
+
 DisableFamilyShareLock: no
 
 DepotResponsePatchEnabled: yes
@@ -20,42 +28,27 @@ DepotDecryptionPattern: ""
 UseWhitelist: no
 AutoFilterList: yes
 AppIds: []
-
 PlayNotOwnedGames: yes
-
 AdditionalApps: []
-
 DlcData: {}
 DenuvoGames: {}
 AppTokens: {}
 FakeOffline: []
 FakeAppIds: {}
 
-IdleStatus:
-  AppId: 0
-  Title: ""
-
-GameTitles: {}
-SubscriptionTimestamps: {}
-
 SafeMode: yes
 Notifications: no
 WarnHashMissmatch: no
 NotifyInit: yes
 API: no
-
-FakeEmail: ""
-FakeWalletBalance: 0
-
 Hammerlog: 2
 ExtendedLogging: yes
 
-# 1794424036: unique RPC LEA to ContentServerDirectory.GetManifestRequestCode#1.
-# Real entry is Shape A PIC at vaddr 0x1505200 (inner 55 89 e5 is +10).
-# Keep protobuf InitFromPacket skipped — that was the 15:26 SIGSEGV.
+# GetManifestRequestCode — RIP LEA to ContentServerDirectory.GetManifestRequestCode#1
+# function entry @ 0x13a5840 (push rbp; mov rbp,rsp; push r14…)
 ManifestHookEnabled: yes
-ManifestPattern: "e8 ? ? ? ? 05 ? ? ? ? 55 89 e5 57 56 53 81 ec 20 01 00 00 8b 7d 08 8b 4d 20"
-GetManifestRequestCodeOffset: 0x1505200
+GetManifestRequestCodeOffset: 0x13a5840
+ManifestPattern: "55 48 89 e5 41 56 49 89 f6 41 55 4c 8d 2d ? ? ? ? 41 54 53 48 89 fb"
 ManifestProvider: Wudrm
 ManifestFallbackProvider: yes
 ManifestLocalCacheFallback: no
@@ -67,23 +60,21 @@ ManifestServerUrl: "https://manifest.activateme.workers.dev"
 ManifestDepotAllowFromKeys: yes
 ManifestDepots: []
 ManifestLuastoolsArchive: yes
+ManifestPinEnabled: yes
 
-OwnershipTicketDiskFallback: no
-
+# UserOwnsDepot — call before "missing license for depot" LEA @ 0x13aa811
+# unique prologue: push r15; push r14; push r13; mov r13,rdi; …
 UserOwnsDepotHookEnabled: yes
-UserOwnsDepotOffset: 0x1a01410
-UserOwnsDepotPattern: "55 e8 ? ? ? ? 81 c5 ? ? ? ? 57 56 53 83 ec 74 ff b4 24"
+UserOwnsDepotOffset: 0x18eb1a0
+UserOwnsDepotPattern: "41 57 41 56 41 55 49 89 fd 41 54 55 53 89 d3 48 83 ec 58"
 
+# BuildDepotDependency — pattern "4D 85 FF 88 44 24" at 0x1079787 is mid-function.
+# Entry is 0x1079640 (41 57 4D 89 CF, int3 pad, RIP lea to the symbol at +0x6f).
+BuildDepotDependencyOffset: 0x1079640
+BuildDepotDependencyPattern: "4D 85 FF 88 44 24"
+
+# Runs from CUser::SpawnGameId (every exe launch), before the process starts.
 SteamlessAutoPatchEnabled: yes
-SteamlessCliPath: "~/.config/hammersteam/SteamlessCLI"
-SteamlessCliTimeoutSeconds: 120
-SteamlessRecursiveScan: yes
-SteamlessQuiet: yes
-SteamlessAppIds: []
-
-DepotDecryptionKeys: {}
-
-StatSteamIds: {}
 
 NetPacketHooksEnabled: no
 NetPacketLogOnly: no
@@ -92,61 +83,25 @@ BBuildAndAsyncSendFrameOffset: 0
 RecvPktOffset: 0
 
 AllowMissingPatterns: yes
-# 1794424036: auto-rediscover hooked IClientUser::RunIPCFrame onto a 194KB
-# function (fnSize=194240). That detour segfaults steam (pid 138118) ~5s after
-# load() during the library-nudge ticket drain. Skip recovery; miss → skip hook.
 AutoRediscoverPatterns: no
-PatternOverrides:
-  # Impossible signatures: skip stale 1791918634 hooks so Steam UI can boot on 1794424036.
-  # Crash remains FakeAppIds::getRealAppIdForCurrentPipe (eax=0xfffff374) even after
-  # IClientUtils::RunIPCFrame was skipped — leftover protobuf/AppManager/ticket detours
-  # still call it. UserOwnsDepot stays enabled via UserOwnsDepotPattern below.
-  # 1794424036: unique 1-hit @ 0x0170d350 (sub esp,0x780). Needs LaunchApp-only SO (not full VFT suite).
-  "IClientAppManager::RunIPCFrame": "e8 ? ? ? ? 81 c6 ? ? ? ? 53 81 ec 80 07 00 00"
-  "IClientApps::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
-  "IClientRemoteStorage::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
-  "IClientUGC::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
-  "IClientUserStats::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
-  "IClientUtils::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
-  "IClientUser::RunIPCFrame": "de ad be ef 00 11 22 33 44 55 66 77"
-  "IClientAppManager::BCanRemotePlayTogether": "de ad be ef 00 11 22 33 44 55 66 77"
-  # Unique on 1794424036 (1 hit). Needed for library owned/PURCHASE; does not call FakeAppIds.
-  "CUser::GetSubscribedApps": "e8 ? ? ? ? 89 c7 83 c4 10 85 c0 74 ? 8b 5d ? 39 d8 7e"
-  "CUser::CheckAppOwnership": "e8 ? ? ? ? 88 45 ? 83 c4 10 84 c0 0f 84 ? ? ? ? 8b 45 ? 80 7d ? 00"
-  "CAPIJob::GetPlayerStats": "de ad be ef 00 11 22 33 44 55 66 77"
-  "CSteamEngine::SetAppIdForCurrentPipe": "de ad be ef 00 11 22 33 44 55 66 77"
-  # 1794424036 crash: InitFromPacket → Achievements/NetPacketUserStats
-  # cmpl $0x15,-0xc(%eax) with eax=0 (CrashID bp-22bfd2b7-…).
-  "CProtoBufMsgBase::InitFromPacket": "de ad be ef 00 11 22 33 44 55 66 77"
-  "CProtoBufMsgBase::Send": "de ad be ef 00 11 22 33 44 55 66 77"
-  "IClientUser::BLoggedOn": "de ad be ef 00 11 22 33 44 55 66 77"
-  "IClientUser::BUpdateAppOwnershipTicket": "de ad be ef 00 11 22 33 44 55 66 77"
-  "IClientUser::GetAppOwnershipTicketExtendedData": "de ad be ef 00 11 22 33 44 55 66 77"
-  "IClientUser::IsUserSubscribedAppInTicket": "de ad be ef 00 11 22 33 44 55 66 77"
-  "IClientUser::GetSteamID": "de ad be ef 00 11 22 33 44 55 66 77"
-  "IClientUser::UpdateAppOwnershipTicket": "de ad be ef 00 11 22 33 44 55 66 77"
-  "CSteamEngine::PostCallback": "de ad be ef 00 11 22 33 44 55 66 77"
-  "CSteamMatchmakingServers::GetServerDetails": "de ad be ef 00 11 22 33 44 55 66 77"
-  "ISteamMatchmakingPingResponse::ServerResponded": "de ad be ef 00 11 22 33 44 55 66 77"
-  "FamilyGroupRunningApp": "de ad be ef 00 11 22 33 44 55 66 77"
-  "StopPlayingBorrowedApp": "de ad be ef 00 11 22 33 44 55 66 77"
-  "BBuildAndAsyncSendFrame": "de ad be ef 00 11 22 33 44 55 66 77"
-  "RecvPkt": "de ad be ef 00 11 22 33 44 55 66 77"
 
-CloudSaveEnabled: yes
-CloudSaveProvider: gdrive
-CloudSaveTokenPath: ~/.config/hammersteam/cloud_save_token.json
-CloudSaveAllAdditionalApps: yes
-CloudSaveAppIds: [553420, 413150]
-CloudSaveSyncAchievements: no
-CloudSaveSyncPlaytime: no
-CloudSaveStorageSubdir: hammer_cloud_save
-CloudSaveGDriveRoot: HammerCloudSave
-# 1794424036: unique "BuildDepotDependency" string (1 LEA) → vaddr 0x11843c0
-# (55 89 e5 57 56 e8 … add esi,GOT). Pin Diner Bros 2 3253150 depot 3253151
-# to .hammer setManifestid gid=7965747117527358690 (Steam used live
-# 4762027129901590213 without this hook).
-ManifestPinEnabled: yes
-ManifestPinDisabledApps: [678950, 1803140]
-BuildDepotDependencyOffset: 0x11843c0
-BuildDepotDependencyPattern: "55 89 e5 57 56 e8 ? ? ? ? 81 c6 ? ? ? ? 53 81 ec 2c 02 00 00 8b 45 08"
+PatternOverrides:
+  # Live SLSsteam x86_64 catalog (1-hit on this steamclient)
+  CUser::CheckAppOwnership: "48 89 E8 31 ED"
+  CUser::GetSubscribedApps: "EB ? 41 8B 50"
+  CSteamEngine::SetAppIdForCurrentPipe: "0F 43 C6 83 FB"
+  CSteamEngine::m_pUser: "4C 03 A5 ? ? ? ? 48 89 DF 4C 89 E2 E8 ? ? ? ? 49 8B 74 24"
+  IClientUtils::m_PipeIndex: "8B B7 ? ? ? ? 64 48 8B 1C 25 ? ? ? ? 48 89 5C 24 ? 48 89 FB 48 81 EF"
+  TraceIPC: "48 89 D7 C1 E8"
+  # Skip until unique x64 signatures / VFT path (SLSsteam style) exist
+  IClientAppManager::RunIPCFrame: "de ad be ef 00 11 22 33 44 55 66 77"
+  IClientApps::RunIPCFrame: "de ad be ef 00 11 22 33 44 55 66 77"
+  IClientRemoteStorage::RunIPCFrame: "de ad be ef 00 11 22 33 44 55 66 77"
+  IClientUGC::RunIPCFrame: "de ad be ef 00 11 22 33 44 55 66 77"
+  IClientUserStats::RunIPCFrame: "de ad be ef 00 11 22 33 44 55 66 77"
+  IClientUtils::RunIPCFrame: "de ad be ef 00 11 22 33 44 55 66 77"
+  IClientUser::RunIPCFrame: "de ad be ef 00 11 22 33 44 55 66 77"
+  CProtoBufMsgBase::InitFromPacket: "de ad be ef 00 11 22 33 44 55 66 77"
+  CProtoBufMsgBase::Send: "de ad be ef 00 11 22 33 44 55 66 77"
+  CAPIJob::GetPlayerStats: "de ad be ef 00 11 22 33 44 55 66 77"
+  CSteamEngine::Init: "de ad be ef 00 11 22 33 44 55 66 77"

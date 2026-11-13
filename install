@@ -4,17 +4,18 @@
 #
 #  Usage (Desktop Mode → Konsole, do NOT run as root):
 #
-#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/bootstrap | bash
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steamrt64-1794424036/bootstrap | bash
 #
 #  Prefer `bootstrap` over `install` directly — GitHub raw CDN can serve a stale
 #  `install` copy for several minutes after an update.
 #
 #  This branch STAYS on Steam 1794424036 (no downgrade, no steam.cfg lock).
-#  It forces the 32-bit ubuntu12_32 client because 1794424036 defaults to
-#  steamrt64 (ELF64) and ELF32 Hammer is ignored there (ELFCLASS32).
-#  Hammer 1.1.21 + 1794424036 config ARE loaded (LD_AUDIT is kept ON).
+#  It uses the steamrt64 client. ELF64 Hammer loads there. The empty file
+#  .steam-disable-steamrt64-client forces ubuntu12_32, so this installer
+#  deletes that sentinel. LD_AUDIT stays ON.
 #
-#  Older commands are unchanged:
+#  Older commands are unchanged (the 32-bit one still writes the sentinel):
+#    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/bootstrap | bash
 #    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/valveoff-1.5/bootstrap | bash
 #    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1791918634/bootstrap | bash
 #    curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1792618285/bootstrap | bash
@@ -26,8 +27,9 @@
 #    1. Detects the host (SteamOS / Bazzite / generic Linux).
 #    2. SMART CLEANUP of any previous OneTap / SLSsteam install
 #       (also deletes steam.cfg so Steam auto-update stays on).
-#    3. Writes ~/.local/share/Steam/.steam-disable-steamrt64-client
-#       (same as STEAM_FORCE_CLIENT=ubuntu12_32).
+#    3. Deletes ~/.local/share/Steam/.steam-disable-steamrt64-client
+#       (and the same file under ~/.steam/root and ~/.steam/steam)
+#       so the 64-bit client is allowed to start.
 #    4. Downloads the ValveOFF bundle into your Downloads folder.
 #    5. Installs Decky Loader (latest) if it isn't already present.
 #    6. Installs Hammer + ValveOFF + hammer-decky and wires Desktop-Mode unlock.
@@ -41,22 +43,22 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
-# steam-1794424036-install-rev=1794424036-ubuntu12-v1
-# Do not bounce to steam-1792618285 / Headcrab pins — this branch must keep
-# Hammer LD_AUDIT on and must not downgrade Steam.
-_INSTALL_PIN="${VALVEOFF_INSTALL_REF:-steam-1794424036}"
-if [ "${VALVEOFF_INSTALL_REV:-}" != "1794424036-ubuntu12-v1" ]; then
-	export VALVEOFF_INSTALL_REV=1794424036-ubuntu12-v1
+# steamrt64-1794424036-install-rev=1794424036-steamrt64-v1
+# Do not bounce to steam-1794424036 (that branch writes the 32-bit sentinel)
+# or to Headcrab pins. This branch keeps LD_AUDIT on and does not downgrade Steam.
+_INSTALL_PIN="${VALVEOFF_INSTALL_REF:-steamrt64-1794424036}"
+if [ "${VALVEOFF_INSTALL_REV:-}" != "1794424036-steamrt64-v1" ]; then
+	export VALVEOFF_INSTALL_REV=1794424036-steamrt64-v1
 fi
 
 # ── Config ──────────────────────────────────────────────────────────────────
 # ValveOFF 1.5 branch — separate from main (ValveOFF 1.4). Do not point 1.4
 # installs here; use `main` for 1.4.
 REPO="dvahana2424-web/hammerdeckydowngrade"
-BRANCH="steam-1794424036"
+BRANCH="steamrt64-1794424036"
 TARGET_STEAM_BUILD=1794424036
-EXPECTED_HAMMER_MD5="${EXPECTED_HAMMER_MD5:-70ea62414ba675cf624f9d4702140a19}"
-EXPECTED_INJECT_MD5="${EXPECTED_INJECT_MD5:-fc644f3120d401fefef2d1764f8fa4cd}"
+EXPECTED_HAMMER_MD5="${EXPECTED_HAMMER_MD5:-3677322f2ef2597ef16673f3b1614c98}"
+EXPECTED_INJECT_MD5="${EXPECTED_INJECT_MD5:-cae5920ce4b55a334646da078baa6fa4}"
 # Unused on this branch (no Steam downgrade). Kept so SKIP helpers still parse.
 STEAM_TRACKING_SHA="${STEAM_TRACKING_SHA:-}"
 STEAM_DOWNGRADE_PARALLEL="${STEAM_DOWNGRADE_PARALLEL:-4}"
@@ -264,7 +266,7 @@ strip_hammer_ld_audit() {
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
-#  STEAM BUILD DETECT + ubuntu12_32 opt-out (no downgrade on this branch)
+#  STEAM BUILD DETECT + remove the 32-bit sentinel (no downgrade on this branch)
 # ═════════════════════════════════════════════════════════════════════════════
 resolve_steam_package_dir() {
 	local d
@@ -337,10 +339,12 @@ steam_client_running() {
 	return 1
 }
 
-force_ubuntu12_client() {
-	title "Force 32-bit ubuntu12_32 client (Steam $TARGET_STEAM_BUILD defaults to steamrt64)"
-	local steam_dir wrote=0 seen=""
-	info "Equivalent flag: STEAM_FORCE_CLIENT=ubuntu12_32"
+# Steam writes this empty file to force ubuntu12_32. ELF64 Hammer cannot load
+# there (ld.so: wrong ELF class). Detect every copy and delete it.
+clear_steamrt64_sentinel() {
+	title "Allow steamrt64 client (remove 32-bit sentinel)"
+	local steam_dir removed=0 seen="" sentinel real
+	info "Looking for .steam-disable-steamrt64-client (STEAM_FORCE_CLIENT=ubuntu12_32)."
 	for steam_dir in \
 		"$HOME_DIR/.local/share/Steam" \
 		"$HOME_DIR/.steam/steam" \
@@ -348,21 +352,28 @@ force_ubuntu12_client() {
 		"$HOME_DIR/.var/app/com.valvesoftware.Steam/.local/share/Steam" \
 		"$HOME_DIR/.var/app/com.valvesoftware.Steam/.steam/steam"; do
 		[ -d "$steam_dir" ] || continue
-		# Skip duplicate paths that resolve to the same directory.
-		local real
 		real="$(readlink -f "$steam_dir" 2>/dev/null || echo "$steam_dir")"
 		case " $seen " in
 			*" $real "*) continue ;;
 		esac
 		seen="$seen $real"
-		: > "$steam_dir/.steam-disable-steamrt64-client"
-		ok "Opted out of steamrt64 → $steam_dir/.steam-disable-steamrt64-client"
-		wrote=1
+		sentinel="$steam_dir/.steam-disable-steamrt64-client"
+		if [ -e "$sentinel" ] || [ -L "$sentinel" ]; then
+			rm -f -- "$sentinel"
+			ok "Removed 32-bit client sentinel: $sentinel"
+			removed=1
+		fi
 	done
-	if [ "$wrote" = 0 ]; then
-		mkdir -p "$HOME_DIR/.local/share/Steam"
-		: > "$HOME_DIR/.local/share/Steam/.steam-disable-steamrt64-client"
-		ok "Opted out of steamrt64 → $HOME_DIR/.local/share/Steam/.steam-disable-steamrt64-client"
+	if [ "$removed" = 0 ]; then
+		ok "No .steam-disable-steamrt64-client sentinel (steamrt64 stays enabled)"
+	fi
+	local steamrt="$HOME_DIR/.local/share/Steam/steamrt64/steam"
+	if [ -x "$steamrt" ]; then
+		ok "steamrt64 client is on disk: $steamrt"
+	else
+		warn "steamrt64 is not downloaded yet."
+		warn "  Launch Steam once, let the update finish, then launch it again."
+		warn "  ELF64 Hammer loads only inside that 64-bit client."
 	fi
 }
 
@@ -390,13 +401,13 @@ ensure_steam_target_build() {
 		fi
 	else
 		warn "Could not read installed Steam build from package/*.manifest"
-		warn "Continuing — Hammer overlay + ubuntu12_32 sentinel will still be applied."
+		warn "Continuing — ELF64 Hammer overlay will still be applied, and the 32-bit sentinel will be removed."
 	fi
-	if [ -n "$active" ] && [[ "$active" == *"_steamrt64" ]]; then
-		warn "steamrt64 channel is active — ELF32 Hammer cannot inject there."
-		warn "Writing .steam-disable-steamrt64-client so the next Steam start uses ubuntu12_32."
+	if [ -n "$active" ] && [[ "$active" != *"_steamrt64" ]]; then
+		warn "Active channel is $active, not steamrt64."
+		warn "Removing .steam-disable-steamrt64-client so the next start can use steamrt64."
 	fi
-	force_ubuntu12_client
+	clear_steamrt64_sentinel
 	return 0
 }
 
@@ -671,9 +682,14 @@ refresh_hammer_from_github() {
 
 	[[ "$(wc -c < "$tmp/hammersteam.so")" -gt 1000000 ]] \
 		|| { rm -rf "$tmp"; warn "hammersteam.so too small — skipping refresh."; return 1; }
-	if ! file "$tmp/hammersteam.so" 2>/dev/null | grep -q 'ELF 32-bit'; then
+	if ! file "$tmp/hammersteam.so" 2>/dev/null | grep -q 'ELF 64-bit'; then
 		rm -rf "$tmp"
-		warn "hammersteam.so is not ELF32 — refusing overlay (steamrt64 ELF64 is not the user path)."
+		warn "hammersteam.so is not ELF64 — refusing overlay (this branch is steamrt64 only)."
+		return 1
+	fi
+	if ! file "$tmp/library-inject.so" 2>/dev/null | grep -q 'ELF 64-bit'; then
+		rm -rf "$tmp"
+		warn "library-inject.so is not ELF64 — refusing overlay."
 		return 1
 	fi
 	local got_md5
@@ -724,7 +740,7 @@ refresh_hammer_from_github() {
 
 	# Best-effort version stamp for the install log.
 	if [ "$(md5sum "$hammer_dir/hammersteam.so" 2>/dev/null | awk '{print $1}')" = "$EXPECTED_HAMMER_MD5" ]; then
-		ok "Installed Hammer 1.1.21 (1794424036 / ELF32 MD5 $EXPECTED_HAMMER_MD5) → $hammer_dir/"
+		ok "Installed Hammer steamrt64 (1794424036 / ELF64 MD5 $EXPECTED_HAMMER_MD5) → $hammer_dir/"
 	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.21"; then
 		ok "Installed Hammer 1.1.21 (manifest-stack) → $hammer_dir/"
 	elif strings "$hammer_dir/hammersteam.so" 2>/dev/null | grep -q "1.1.17"; then
@@ -837,7 +853,7 @@ apply_gamemode_unlock() {
 #  MAIN
 # ═════════════════════════════════════════════════════════════════════════════
 main() {
-	title "ValveOFF 1.5 + Hammer 1.1.21 (Steam Deck Stable $TARGET_STEAM_BUILD)"
+	title "ValveOFF 1.5 + Hammer steamrt64 (Steam Deck Stable $TARGET_STEAM_BUILD)"
 	info "User: $USER_NAME    Home: $HOME_DIR"
 	info "Downloads: $DL_DIR"
 	detect_distro
@@ -845,27 +861,29 @@ main() {
 
 	smart_cleanup
 	stop_steam
-	# Stay on 1794424036. Force ubuntu12_32. Do NOT strip LD_AUDIT — Hammer
-	# 1.1.21 + this config are the working path for this client.
-	ensure_steam_target_build || die "ubuntu12_32 client opt-out failed."
+	# Stay on 1794424036. Use steamrt64. Do NOT strip LD_AUDIT.
+	ensure_steam_target_build || die "steamrt64 sentinel removal failed."
 	download_bundle
 	install_decky
 	install_core
 	refresh_hammer_from_github || true
+	# Run again after the bundle install, in case an older install.sh recreated it.
+	clear_steamrt64_sentinel
 	overlay_hammer_decky_in_bundle
 	install_hammer_decky_from_bundle
 	apply_gamemode_unlock
 	relock_rootfs
+	clear_steamrt64_sentinel
 
 	title "${C_B}DONE${C_RST}"
 	cat <<EOF
 
-  Steam Deck Stable ${TARGET_STEAM_BUILD} — Hammer 1.1.21 ELF32 installed.
-  steamrt64 is opted out via .steam-disable-steamrt64-client
-  (same as STEAM_FORCE_CLIENT=ubuntu12_32). steam.cfg was NOT locked.
+  Steam Deck Stable ${TARGET_STEAM_BUILD} — Hammer ELF64 (steamrt64) installed.
+  .steam-disable-steamrt64-client was removed so the 64-bit client can start.
+  steam.cfg was NOT locked.
 
   ${C_B}1.${C_RST} Launch Steam in Desktop Mode. Settings → Version should be ${TARGET_STEAM_BUILD}.
-  ${C_B}2.${C_RST} Confirm ~/.Hammer.log has:  steamclient.so loaded from ubuntu12_32
+  ${C_B}2.${C_RST} Confirm ~/.Hammer.log has:  steamclient.so loaded from steamrt64
   ${C_B}3.${C_RST} Run ValveOFF once to activate your license:
          "$DEST/ValveOFF"
   ${C_B}4.${C_RST} Ownership + GetManifest + manifest pin are ON in config.yaml.

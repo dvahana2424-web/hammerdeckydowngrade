@@ -1,32 +1,33 @@
 #!/usr/bin/env bash
-# update-hammer.sh — Hammer 1.1.21 (LaunchApp-only / Steamless) for Steam Deck Stable 1794424036.
-# Downloads hammersteam.so, library-inject.so, config.yaml from this branch
-# and forces the 32-bit ubuntu12_32 client (steamrt64 opt-out).
+# update-hammer.sh — ELF64 Hammer for Steam Deck Stable 1794424036 steamrt64.
+# Downloads hammersteam.so, library-inject.so, and config.yaml from this branch
+# and removes .steam-disable-steamrt64-client so the 64-bit client can start.
 #
 # One-paste update (close Steam first):
-#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/update-hammer.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steamrt64-1794424036/update-hammer.sh | bash
 #
 # Keep your local config.yaml (only update the .so files):
-#   KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/update-hammer.sh | bash
+#   KEEP_CONFIG=1 curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steamrt64-1794424036/update-hammer.sh | bash
 #
 # What this build ships:
-#   - ELF32 hammersteam.so MD5 70ea62414ba675cf624f9d4702140a19
-#     (LaunchApp-only AppManager VFT — Steamless path; full VFT suite crashed Steam)
-#   - config.yaml with verified RunIPCFrame pattern:
-#       "e8 ? ? ? ? 81 c6 ? ? ? ? 53 81 ec 80 07 00 00"  (@ 0x0170d350)
-#   - library-inject.so unchanged (fc644f3120d401fefef2d1764f8fa4cd)
+#   - ELF64 hammersteam.so MD5 3677322f2ef2597ef16673f3b1614c98
+#   - ELF64 library-inject.so MD5 cae5920ce4b55a334646da078baa6fa4
+#   - config.yaml for steamclient build 1794424036
+#       GetManifestRequestCodeOffset 0x13a5840
+#       UserOwnsDepotOffset 0x18eb1a0
+#       BuildDepotDependencyOffset 0x1079640
 #
-# Older Steam builds — do not use this script:
-#   steam-1791918634 / steam-1792618285 / valveoff-1.5
+# The 32-bit command is unchanged. Do not use it for this client:
+#   curl -fsSL https://raw.githubusercontent.com/dvahana2424-web/hammerdeckydowngrade/steam-1794424036/update-hammer.sh | bash
 #
 set -euo pipefail
 
 REPO_OWNER="dvahana2424-web"
 REPO_NAME="hammerdeckydowngrade"
-BRANCH="steam-1794424036"
+BRANCH="steamrt64-1794424036"
 BASE_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}"
-EXPECTED_HAMMER_MD5="70ea62414ba675cf624f9d4702140a19"
-EXPECTED_INJECT_MD5="fc644f3120d401fefef2d1764f8fa4cd"
+EXPECTED_HAMMER_MD5="3677322f2ef2597ef16673f3b1614c98"
+EXPECTED_INJECT_MD5="cae5920ce4b55a334646da078baa6fa4"
 
 HAMMER_DIR="${HAMMER_DIR:-$HOME/.local/share/Hammer}"
 
@@ -89,9 +90,10 @@ steam_running() {
 		|| pgrep -f '[s]team -srt' >/dev/null 2>&1
 }
 
-force_ubuntu12_client() {
-	local steam_dir wrote=0
-	info "Opting out of steamrt64 (1794424036 defaults to ELF64 SteamRT3) …"
+# The empty sentinel forces ubuntu12_32. ELF64 Hammer cannot load there.
+clear_steamrt64_sentinel() {
+	local steam_dir removed=0 sentinel
+	info "Looking for .steam-disable-steamrt64-client …"
 	for steam_dir in \
 		"$HOME/.local/share/Steam" \
 		"$HOME/.steam/steam" \
@@ -99,34 +101,37 @@ force_ubuntu12_client() {
 		"$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam" \
 		"$HOME/.var/app/com.valvesoftware.Steam/.steam/steam"; do
 		[ -d "$steam_dir" ] || continue
-		: > "$steam_dir/.steam-disable-steamrt64-client"
-		ok "Forced ubuntu12_32 → $steam_dir/.steam-disable-steamrt64-client"
-		wrote=1
+		sentinel="$steam_dir/.steam-disable-steamrt64-client"
+		if [ -e "$sentinel" ] || [ -L "$sentinel" ]; then
+			rm -f -- "$sentinel"
+			ok "Removed 32-bit client sentinel: $sentinel"
+			removed=1
+		fi
 	done
-	if [ "$wrote" = 0 ]; then
-		mkdir -p "$HOME/.local/share/Steam"
-		: > "$HOME/.local/share/Steam/.steam-disable-steamrt64-client"
-		ok "Forced ubuntu12_32 → $HOME/.local/share/Steam/.steam-disable-steamrt64-client"
+	if [ "$removed" = 0 ]; then
+		ok "No .steam-disable-steamrt64-client sentinel (steamrt64 stays enabled)"
 	fi
-	info "Equivalent flag: STEAM_FORCE_CLIENT=ubuntu12_32"
+	if [ -x "$HOME/.local/share/Steam/steamrt64/steam" ]; then
+		ok "steamrt64 client is on disk"
+	else
+		warn "steamrt64 is not downloaded yet. Launch Steam once and let it update."
+	fi
 }
 
-verify_config_has_steamless_pattern() {
+verify_config_offsets() {
 	local cfg="$1"
-	if ! grep -q 'IClientAppManager::RunIPCFrame' "$cfg"; then
-		warn "config.yaml missing IClientAppManager::RunIPCFrame — Steamless auto-patch will stay off."
-		return 0
-	fi
-	if grep -q 'IClientAppManager::RunIPCFrame".*"de ad be ef' "$cfg" \
-		|| grep -q 'IClientAppManager::RunIPCFrame: "de ad be ef' "$cfg"; then
-		warn "config.yaml still has dead RunIPCFrame pattern — Steamless will not fire."
-		return 0
-	fi
-	if grep -q '81 ec 80 07 00 00' "$cfg"; then
-		ok "config.yaml has Steamless RunIPCFrame pattern (0x0170d350)."
-	else
-		warn "config.yaml RunIPCFrame pattern may be unexpected — check PatternOverrides."
-	fi
+	local key
+	for key in \
+		'GetManifestRequestCodeOffset: 0x13a5840' \
+		'UserOwnsDepotOffset: 0x18eb1a0' \
+		'BuildDepotDependencyOffset: 0x1079640'
+	do
+		if grep -q "$key" "$cfg"; then
+			ok "config.yaml has $key"
+		else
+			warn "config.yaml missing $key"
+		fi
+	done
 }
 
 main() {
@@ -135,8 +140,8 @@ main() {
 	need_cmd cp
 	need_cmd date
 
-	info "Hammer 1.1.21 (LaunchApp-only / Steamless) update from ${BASE_URL}"
-	info "Target Steam: Deck Stable 1794424036 (32-bit ubuntu12_32 client)"
+	info "Hammer steamrt64 update from ${BASE_URL}"
+	info "Target Steam: Deck Stable 1794424036 (64-bit steamrt64 client)"
 
 	if steam_running; then
 		warn "Steam appears to be running."
@@ -155,8 +160,10 @@ main() {
 
 	[[ "$(wc -c < "$tmp/hammersteam.so")" -gt 1000000 ]] \
 		|| die "hammersteam.so looks too small — aborting."
-	file "$tmp/hammersteam.so" 2>/dev/null | grep -q 'ELF 32-bit' \
-		|| die "hammersteam.so is not ELF32 — refusing to install (steamrt64 ELF64 Hammer is not the user path)."
+	file "$tmp/hammersteam.so" 2>/dev/null | grep -q 'ELF 64-bit' \
+		|| die "hammersteam.so is not ELF64 — refusing to install."
+	file "$tmp/library-inject.so" 2>/dev/null | grep -q 'ELF 64-bit' \
+		|| die "library-inject.so is not ELF64 — refusing to install."
 
 	local got
 	got="$(file_md5 "$tmp/hammersteam.so")"
@@ -183,12 +190,11 @@ main() {
 	chmod 0755 "$HAMMER_SO" "$INJECT_SO"
 
 	ok "Installed:"
-	ok "  $HAMMER_SO  (ELF32 LaunchApp-only MD5 $EXPECTED_HAMMER_MD5)"
+	ok "  $HAMMER_SO  (ELF64 steamrt64 MD5 $EXPECTED_HAMMER_MD5)"
 	ok "  $INJECT_SO"
 
 	if [[ -f "$CONFIG_FILE" ]] && [[ "${KEEP_CONFIG:-0}" = "1" ]]; then
 		warn "KEEP_CONFIG=1 — leaving your existing config.yaml untouched."
-		warn "If Steamless is off, set IClientAppManager::RunIPCFrame to the 0x0170d350 pattern."
 	else
 		if [[ -f "$CONFIG_FILE" ]]; then
 			cp -a "$CONFIG_FILE" "$backup_dir/"
@@ -197,11 +203,11 @@ main() {
 		cp -f "$tmp/config.yaml" "$CONFIG_FILE"
 		chmod 0644 "$CONFIG_FILE"
 		ok "  $CONFIG_FILE"
-		verify_config_has_steamless_pattern "$CONFIG_FILE"
+		verify_config_offsets "$CONFIG_FILE"
 	fi
 	ok "Backups: $backup_dir"
 
-	force_ubuntu12_client
+	clear_steamrt64_sentinel
 
 	if download "${BASE_URL}/VERSION.txt" "$tmp/VERSION.txt" 2>/dev/null; then
 		info "Package version:"
@@ -211,10 +217,8 @@ main() {
 	echo
 	ok "Done. Restart Steam."
 	ok "Confirm ~/.Hammer.log has:"
-	ok "  - ubuntu12_32/steamclient.so loaded"
-	ok "  - IClientAppManager::RunIPCFrame NOT 'detour skipped'"
-	ok "  - LaunchApp-only / IClientAppManager::LaunchApp on Play (Steamless)"
-	warn "Do NOT use the old full-VFT SO (MD5 8b36458d…) — it crashes with this pattern."
+	ok "  - steamrt64/steamclient.so loaded"
+	ok "  - UserOwnsDepot and GetManifest installed"
 }
 
 main "$@"
